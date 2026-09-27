@@ -52,4 +52,4 @@ Add your own custom tags from the "+ Add Tag" box on the Add New Meal page. Cust
 
 ## Meals
 
-The meal library starts empty — add your own real meals and their info on the Add New Meal page.
+The meal library ships pre-loaded with 52 real meals (`js/meal-seed-data.js`), transcribed and categorized from the family's meal-planning slideshow. This seed only loads once, into a browser that has never opened the app before — after that it's just your live meal library. Add, edit (delete + re-add), or clear meals anytime on the Add New Meal page; clicking "Clear All Meals" is permanent and won't bring the seed data back.

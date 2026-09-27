@@ -42,7 +42,32 @@ const STORAGE_KEYS = {
   filters: "mpw_filters",
   customTags: "mpw_custom_tags",
   currentWeekKey: "mpw_current_week_key",
+  seeded: "mpw_seeded",
 };
+
+function slugify(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+// Loads the real meal library once, the very first time the app runs on a
+// browser with an empty library. Never re-seeds after that, so clicking
+// "Clear All Meals" later actually clears them for good.
+function seedMealsIfNeeded() {
+  if (loadJSON(STORAGE_KEYS.seeded, false)) return;
+  saveJSON(STORAGE_KEYS.seeded, true);
+  if (state.meals.length > 0) return;
+  if (typeof DEFAULT_MEAL_SEED === "undefined") return;
+
+  state.meals = DEFAULT_MEAL_SEED.map(([name, slots, tags]) => ({
+    id: `seed_${slugify(name)}`,
+    name,
+    slots,
+    tags,
+    lastUsed: null,
+    usageHistory: [],
+  }));
+  persistMeals();
+}
 
 /* ---------------------- Storage helpers ---------------------- */
 
@@ -796,7 +821,7 @@ function renderMealLibrary() {
   mealLibraryListEl.innerHTML = "";
 
   if (state.meals.length === 0) {
-    mealLibraryListEl.innerHTML = `<div class="empty-state">No meals yet. Add one above, or click "Load Example Meals" to try the planner out.</div>`;
+    mealLibraryListEl.innerHTML = `<div class="empty-state">No meals yet. Add one above to get started.</div>`;
     return;
   }
 
@@ -850,4 +875,5 @@ document.getElementById("clear-meals-btn").addEventListener("click", () => {
    Init
    ===================================================================== */
 
+seedMealsIfNeeded();
 showView("plan");
