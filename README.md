@@ -5,7 +5,7 @@ A simple, static weekly meal planner. No build step, no server, no dependencies 
 ## Navbar
 
 - **Meal Planning** — Pick a week on a year-long calendar, then fill in a 7-day (Sunday–Saturday) table with 6 meal rows: Kids Breakfast, Namath Lunch, Kids Dinner, Parents Breakfast, Parents Lunch, Parents Dinner.
-- **Add New Meal** — Build your meal library: name, which meal slot(s) it fits, and tags (Carby, High Effort, Low Effort, Healthy, Quick, Kid-Favorite, or your own custom tags).
+- **Add New Meal** — Build your meal library: name, which meal slot(s) it fits, and tags (effort/time, diet, main protein, practicality, cost/occasion, and more — see Categories below — or your own custom tags).
 - **All PDFs** — Every week you've saved & printed shows up here so you can reopen and print it again.
 
 ## How the week picker works
@@ -36,6 +36,19 @@ Click **✨ Auto-Populate Week** to fill every *empty* box with a meal suitable 
 
 Click **🖨️ Save & Print PDF** on a filled-in week. This adds the week to **All PDFs** and opens your browser's print dialog — choose "Save as PDF" as the destination to get an actual PDF file, or print it directly.
 
+## Categories (tags)
+
+Default tags cover common ways to filter a weekly plan:
+
+- **Effort / time**: Quick, Low Effort, High Effort, Meal-Prep Friendly, One-Pot
+- **Nutrition / diet**: Healthy, Carby, Low-Carb, Vegetarian, Vegan, Gluten-Free, Dairy-Free
+- **Main protein**: Chicken, Beef, Pork, Seafood, Meatless
+- **Practicality**: Leftover-Friendly, Freezer-Friendly, Kid-Favorite, Picky-Eater-Safe
+- **Cost / occasion**: Budget-Friendly, Takeout / Restaurant Night, Weekend / Special
+- **Other**: Spicy, Seasonal, New Recipe
+
+Add your own custom tags from the "+ Add Tag" box on the Add New Meal page. Custom tags (not the defaults above) can be removed with the "×" next to them — removing one strips it from any meals that had it.
+
 ## Meals
 
-The meal library starts empty so you can add your own real meals and their info. Click **Load Example Meals** on the Add New Meal page if you'd like some sample meals to try the planner out with (you can delete them anytime).
+The meal library starts empty — add your own real meals and their info on the Add New Meal page.

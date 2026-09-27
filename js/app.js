@@ -15,7 +15,20 @@ const SLOTS = [
   { key: "parents-dinner", label: "Parents Dinner" },
 ];
 
-const DEFAULT_TAGS = ["Carby", "High Effort", "Low Effort", "Healthy", "Quick", "Kid-Favorite"];
+const DEFAULT_TAGS = [
+  // Effort / time
+  "Quick", "Low Effort", "High Effort", "Meal-Prep Friendly", "One-Pot",
+  // Nutrition / diet
+  "Healthy", "Carby", "Low-Carb", "Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free",
+  // Main protein
+  "Chicken", "Beef", "Pork", "Seafood", "Meatless",
+  // Practicality
+  "Leftover-Friendly", "Freezer-Friendly", "Kid-Favorite", "Picky-Eater-Safe",
+  // Cost / occasion
+  "Budget-Friendly", "Takeout / Restaurant Night", "Weekend / Special",
+  // Other
+  "Spicy", "Seasonal", "New Recipe",
+];
 
 const DOW_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -327,7 +340,9 @@ function mealPassesFilters(meal, weekStartISO) {
     const weekStart = fromISODate(weekStartISO);
     const lastUsedDate = fromISODate(meal.lastUsed);
     const diffDays = Math.round((weekStart - lastUsedDate) / (1000 * 60 * 60 * 24));
-    if (diffDays < state.filters.recencyWeeks * 7) return false;
+    // meal.lastUsed is always a week-start (Sunday), so diffDays is a multiple of 7.
+    // recencyWeeks=1 should hide meals used THIS week or the immediately preceding week.
+    if (diffDays >= 0 && diffDays <= state.filters.recencyWeeks * 7) return false;
   }
   return true;
 }
@@ -697,8 +712,39 @@ function renderTagCheckboxes() {
     const span = document.createElement("span");
     span.textContent = tag;
     label.appendChild(span);
+
+    if (state.customTags.includes(tag)) {
+      const removeBtn = document.createElement("span");
+      removeBtn.textContent = " ×";
+      removeBtn.title = `Remove custom tag "${tag}"`;
+      removeBtn.style.cursor = "pointer";
+      removeBtn.style.fontWeight = "700";
+      removeBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        removeCustomTag(tag);
+      });
+      label.appendChild(removeBtn);
+    }
+
     mealTagsCheckboxesEl.appendChild(label);
   });
+}
+
+function removeCustomTag(tag) {
+  if (!confirm(`Remove the custom tag "${tag}"? It will be removed from any meals that have it.`)) return;
+  state.customTags = state.customTags.filter((t) => t !== tag);
+  persistCustomTags();
+  state.meals.forEach((m) => {
+    if (m.tags) m.tags = m.tags.filter((t) => t !== tag);
+  });
+  persistMeals();
+  if (state.filters.excludedTags.includes(tag)) {
+    state.filters.excludedTags = state.filters.excludedTags.filter((t) => t !== tag);
+    persistFilters();
+  }
+  renderTagCheckboxes();
+  renderMealLibrary();
 }
 
 document.getElementById("add-tag-btn").addEventListener("click", () => {
@@ -710,6 +756,13 @@ document.getElementById("add-tag-btn").addEventListener("click", () => {
   }
   newTagInput.value = "";
   renderTagCheckboxes();
+});
+
+newTagInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("add-tag-btn").click();
+  }
 });
 
 document.getElementById("add-meal-form").addEventListener("submit", (e) => {
@@ -790,51 +843,6 @@ document.getElementById("clear-meals-btn").addEventListener("click", () => {
   persistMeals();
   renderMealLibrary();
 });
-
-document.getElementById("load-examples-btn").addEventListener("click", () => {
-  const examples = buildExampleMeals();
-  const existingNames = new Set(state.meals.map((m) => m.name.toLowerCase()));
-  const toAdd = examples.filter((m) => !existingNames.has(m.name.toLowerCase()));
-  if (toAdd.length === 0) {
-    alert("Example meals are already in your library.");
-    return;
-  }
-  state.meals.push(...toAdd);
-  persistMeals();
-  renderMealLibrary();
-});
-
-function buildExampleMeals() {
-  const mk = (name, slots, tags) => ({
-    id: `meal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    name,
-    slots,
-    tags,
-    lastUsed: null,
-    usageHistory: [],
-  });
-
-  return [
-    mk("Scrambled Eggs & Toast", ["kids-breakfast", "parents-breakfast"], ["Quick", "Kid-Favorite"]),
-    mk("Oatmeal with Berries", ["kids-breakfast", "parents-breakfast"], ["Healthy", "Quick"]),
-    mk("Pancakes", ["kids-breakfast", "parents-breakfast"], ["Carby", "Kid-Favorite"]),
-    mk("Yogurt & Granola", ["kids-breakfast", "parents-breakfast"], ["Quick", "Healthy"]),
-    mk("Grilled Cheese & Soup", ["namath-lunch"], ["Carby", "Kid-Favorite", "Quick"]),
-    mk("Turkey Sandwich", ["namath-lunch"], ["Quick", "Low Effort"]),
-    mk("Chicken Caesar Salad", ["namath-lunch"], ["Healthy"]),
-    mk("Leftover Night", ["namath-lunch", "parents-lunch", "parents-dinner"], ["Low Effort", "Quick"]),
-    mk("Chicken Nuggets & Veggies", ["kids-dinner"], ["Kid-Favorite", "Quick"]),
-    mk("Mac and Cheese", ["kids-dinner"], ["Carby", "Kid-Favorite", "High Effort"]),
-    mk("Spaghetti and Meatballs", ["kids-dinner", "parents-dinner"], ["Carby", "High Effort", "Kid-Favorite"]),
-    mk("Tacos", ["kids-dinner", "parents-dinner"], ["Kid-Favorite", "Quick"]),
-    mk("Grilled Salmon & Rice", ["parents-dinner"], ["Healthy", "High Effort"]),
-    mk("Stir Fry Veggies & Tofu", ["parents-lunch", "parents-dinner"], ["Healthy"]),
-    mk("Roast Chicken & Potatoes", ["parents-dinner"], ["High Effort"]),
-    mk("Avocado Toast", ["parents-breakfast"], ["Healthy", "Quick"]),
-    mk("Breakfast Burritos", ["kids-breakfast", "parents-breakfast"], ["Carby", "High Effort"]),
-    mk("Homemade Pizza Night", ["kids-dinner", "parents-dinner"], ["Carby", "High Effort", "Kid-Favorite"]),
-  ];
-}
 
 /* =====================================================================
    Init
