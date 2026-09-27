@@ -423,9 +423,12 @@ function positionMealPicker(anchorEl) {
   }
 }
 
-function openMealPicker({ anchorEl, slotKey, weekStart, onPick }) {
+function openMealPicker({ anchorEl, weekStart, onPick }) {
+  // Show every meal here regardless of which slots it's assigned to - the
+  // slot checkboxes on Add New Meal are only used to steer Auto-Populate,
+  // not to hide meals from manual picking.
   const candidates = state.meals
-    .filter((m) => mealFitsSlot(m, slotKey) && mealPassesFilters(m, weekStart))
+    .filter((m) => mealPassesFilters(m, weekStart))
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -545,7 +548,7 @@ function renderWeekTable() {
       };
 
       pickBtn.addEventListener("click", () => {
-        openMealPicker({ anchorEl: pickBtn, slotKey: slot.key, weekStart: plan.weekStart, onPick: pick });
+        openMealPicker({ anchorEl: pickBtn, weekStart: plan.weekStart, onPick: pick });
       });
 
       textarea.addEventListener("input", () => {
