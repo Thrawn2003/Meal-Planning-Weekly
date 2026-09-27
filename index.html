@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meal Planning Weekly</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="navbar-brand">🍽️ Meal Planning Weekly</div>
+  <nav class="navbar-links">
+    <button class="nav-link active" data-view="plan">Meal Planning</button>
+    <button class="nav-link" data-view="add-meal">Add New Meal</button>
+    <button class="nav-link" data-view="pdfs">All PDFs</button>
+  </nav>
+</header>
+
+<main id="app">
+
+  <!-- ===================== MEAL PLANNING VIEW ===================== -->
+  <section id="view-plan" class="view">
+
+    <!-- Step 1: pick a week from a year calendar -->
+    <div id="calendar-picker">
+      <div class="panel-heading">
+        <h1>Pick the week you're planning</h1>
+        <p class="hint">Click a start date and an end date anywhere in the calendar below. We'll build the full Sunday&ndash;Saturday week around them.</p>
+      </div>
+
+      <div class="calendar-toolbar">
+        <button id="cal-prev-year" class="btn btn-secondary" aria-label="Previous year">&larr; Prev Year</button>
+        <div id="cal-year-label" class="cal-year-label"></div>
+        <button id="cal-next-year" class="btn btn-secondary" aria-label="Next year">Next Year &rarr;</button>
+        <button id="cal-today" class="btn btn-secondary">Jump to Today</button>
+      </div>
+
+      <div id="cal-selection-status" class="cal-selection-status"></div>
+
+      <div id="year-calendar" class="year-calendar"></div>
+    </div>
+
+    <!-- Step 2: the week table -->
+    <div id="week-table-wrap" class="hidden">
+
+      <div class="week-header">
+        <button id="change-week-btn" class="btn btn-secondary">&larr; Change Week</button>
+        <h1 id="week-title" class="week-title">Week of ...</h1>
+        <div class="week-actions">
+          <button id="auto-populate-btn" class="btn btn-accent">✨ Auto-Populate Week</button>
+          <button id="clear-week-btn" class="btn btn-danger">Clear Week</button>
+          <button id="save-pdf-btn" class="btn btn-primary">🖨️ Save &amp; Print PDF</button>
+        </div>
+      </div>
+
+      <details class="filters-panel" id="filters-panel">
+        <summary>Filters (hide certain meals from dropdowns &amp; auto-populate)</summary>
+        <div class="filters-body">
+          <div class="filter-group">
+            <div class="filter-group-title">Hide meal tags:</div>
+            <div id="tag-filter-list" class="tag-filter-list"></div>
+          </div>
+          <div class="filter-group">
+            <div class="filter-group-title">Hide meals used within the last:</div>
+            <select id="recency-filter">
+              <option value="0">No limit</option>
+              <option value="1">1 week</option>
+              <option value="2">2 weeks</option>
+              <option value="3">3 weeks</option>
+              <option value="4">4 weeks</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <div class="table-scroll">
+        <table id="week-table" class="week-table">
+          <thead>
+            <tr id="week-table-head-row"></tr>
+          </thead>
+          <tbody id="week-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Print-only view, populated right before printing -->
+    <div id="print-area" class="print-only"></div>
+
+  </section>
+
+  <!-- ===================== ADD NEW MEAL VIEW ===================== -->
+  <section id="view-add-meal" class="view hidden">
+    <div class="panel-heading">
+      <h1>Add New Meal</h1>
+      <p class="hint">Build your meal library here. Every meal you add can be chosen from the dropdowns in the weekly planner and used by Auto-Populate.</p>
+    </div>
+
+    <form id="add-meal-form" class="card meal-form">
+      <div class="form-row">
+        <label for="meal-name">Meal name</label>
+        <input type="text" id="meal-name" placeholder="e.g. Spaghetti and Meatballs" required>
+      </div>
+
+      <div class="form-row">
+        <label>Which meal slots does this fit?</label>
+        <div id="meal-slots-checkboxes" class="checkbox-grid"></div>
+      </div>
+
+      <div class="form-row">
+        <label>Tags (pick any, or add your own)</label>
+        <div id="meal-tags-checkboxes" class="checkbox-grid"></div>
+        <div class="inline-add">
+          <input type="text" id="new-tag-input" placeholder="Add a custom tag e.g. Spicy">
+          <button type="button" id="add-tag-btn" class="btn btn-secondary">+ Add Tag</button>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <button type="submit" class="btn btn-primary">Add Meal</button>
+      </div>
+    </form>
+
+    <div class="meal-library-toolbar">
+      <h2>Your Meal Library</h2>
+      <div>
+        <button id="load-examples-btn" class="btn btn-secondary">Load Example Meals</button>
+        <button id="clear-meals-btn" class="btn btn-danger">Clear All Meals</button>
+      </div>
+    </div>
+
+    <div id="meal-library-list" class="meal-library-list"></div>
+  </section>
+
+  <!-- ===================== ALL PDFS VIEW ===================== -->
+  <section id="view-pdfs" class="view hidden">
+    <div class="panel-heading">
+      <h1>All PDFs</h1>
+      <p class="hint">Every week you've saved &amp; printed shows up here. Reopen any of them to print or save as PDF again.</p>
+    </div>
+    <div id="pdf-history-list" class="pdf-history-list"></div>
+  </section>
+
+</main>
+
+<script src="js/app.js"></script>
+</body>
+</html>
