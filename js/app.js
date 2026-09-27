@@ -42,30 +42,16 @@ const STORAGE_KEYS = {
   filters: "mpw_filters",
   customTags: "mpw_custom_tags",
   currentWeekKey: "mpw_current_week_key",
-  seeded: "mpw_seeded",
 };
 
-function slugify(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-// Loads the real meal library once, the very first time the app runs on a
-// browser with an empty library. Never re-seeds after that, so clicking
-// "Clear All Meals" later actually clears them for good.
-function seedMealsIfNeeded() {
-  if (loadJSON(STORAGE_KEYS.seeded, false)) return;
-  saveJSON(STORAGE_KEYS.seeded, true);
-  if (state.meals.length > 0) return;
-  if (typeof DEFAULT_MEAL_SEED === "undefined") return;
-
-  state.meals = DEFAULT_MEAL_SEED.map(([name, slots, tags]) => ({
-    id: `seed_${slugify(name)}`,
-    name,
-    slots,
-    tags,
-    lastUsed: null,
-    usageHistory: [],
-  }));
+// One-time cleanup for browsers that got the old placeholder meal library
+// (every meal's id started with "seed_"). Only clears if EVERY meal is
+// still an untouched placeholder, so nothing the user actually added is
+// ever at risk of being wiped.
+function clearOldPlaceholderMealsIfPresent() {
+  if (state.meals.length === 0) return;
+  if (!state.meals.every((m) => typeof m.id === "string" && m.id.startsWith("seed_"))) return;
+  state.meals = [];
   persistMeals();
 }
 
@@ -947,5 +933,5 @@ document.getElementById("clear-meals-btn").addEventListener("click", () => {
    Init
    ===================================================================== */
 
-seedMealsIfNeeded();
+clearOldPlaceholderMealsIfPresent();
 showView("plan");
