@@ -45,6 +45,7 @@ Default tags cover common ways to filter a weekly plan:
 - **Main protein**: Chicken, Beef, Pork, Seafood, Meatless
 - **Practicality**: Leftover-Friendly, Freezer-Friendly, Kid-Favorite, Picky-Eater-Safe
 - **Cost / occasion**: Budget-Friendly, Takeout / Restaurant Night, Weekend / Special
+- **Cuisine**: South Asian, American, Italian, Mexican, Chinese, Other Cuisine
 - **Other**: Spicy, Seasonal, New Recipe
 
 Add your own custom tags from the "+ Add Tag" box on the Add New Meal page. Custom tags (not the defaults above) can be removed with the "×" next to them — removing one strips it from any meals that had it.

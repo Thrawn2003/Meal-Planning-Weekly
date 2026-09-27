@@ -26,6 +26,8 @@ const DEFAULT_TAGS = [
   "Leftover-Friendly", "Freezer-Friendly", "Kid-Favorite", "Picky-Eater-Safe",
   // Cost / occasion
   "Budget-Friendly", "Takeout / Restaurant Night", "Weekend / Special",
+  // Cuisine
+  "South Asian", "American", "Italian", "Mexican", "Chinese", "Other Cuisine",
   // Other
   "Spicy", "Seasonal", "New Recipe",
 ];
