@@ -399,6 +399,106 @@ function weekDates(plan) {
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
 }
 
+/* ---------------------- Meal picker (shared floating panel) ----------------------
+   A single panel reused for every cell, positioned with the viewport (not an
+   ancestor's scroll box), so the full option list is always fully on-screen
+   and scrollable in place — no matter where the cell is on the page. */
+
+const mealPickerPanelEl = document.createElement("div");
+mealPickerPanelEl.className = "meal-picker-panel hidden";
+document.body.appendChild(mealPickerPanelEl);
+
+let activeMealPicker = null; // { anchorEl }
+
+function closeMealPicker() {
+  mealPickerPanelEl.classList.add("hidden");
+  activeMealPicker = null;
+}
+
+function positionMealPicker(anchorEl) {
+  const rect = anchorEl.getBoundingClientRect();
+  const margin = 6;
+  const width = Math.max(rect.width, 280);
+
+  mealPickerPanelEl.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
+  mealPickerPanelEl.style.width = `${width}px`;
+
+  const spaceBelow = window.innerHeight - rect.bottom - margin;
+  const spaceAbove = rect.top - margin;
+
+  if (spaceBelow >= 180 || spaceBelow >= spaceAbove) {
+    mealPickerPanelEl.style.top = `${rect.bottom + margin}px`;
+    mealPickerPanelEl.style.bottom = "auto";
+    mealPickerPanelEl.style.maxHeight = `${Math.max(120, Math.min(340, spaceBelow))}px`;
+  } else {
+    mealPickerPanelEl.style.bottom = `${window.innerHeight - rect.top + margin}px`;
+    mealPickerPanelEl.style.top = "auto";
+    mealPickerPanelEl.style.maxHeight = `${Math.max(120, Math.min(340, spaceAbove))}px`;
+  }
+}
+
+function openMealPicker({ anchorEl, slotKey, weekStart, onPick }) {
+  const candidates = state.meals
+    .filter((m) => mealFitsSlot(m, slotKey) && mealPassesFilters(m, weekStart))
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  mealPickerPanelEl.innerHTML = "";
+
+  if (candidates.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "meal-picker-empty";
+    empty.textContent = "No meals fit here yet (check your filters, or add one on Add New Meal).";
+    mealPickerPanelEl.appendChild(empty);
+  } else {
+    candidates.forEach((m) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "meal-picker-item";
+      item.textContent = m.name;
+      // mousedown fires before the calling button's own click/blur, so the
+      // selection registers before anything else can close the panel first.
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        onPick(m);
+      });
+      mealPickerPanelEl.appendChild(item);
+    });
+  }
+
+  positionMealPicker(anchorEl);
+  mealPickerPanelEl.classList.remove("hidden");
+  mealPickerPanelEl.scrollTop = 0;
+  activeMealPicker = { anchorEl };
+}
+
+document.addEventListener("click", (e) => {
+  if (!activeMealPicker) return;
+  if (mealPickerPanelEl.contains(e.target) || e.target === activeMealPicker.anchorEl) return;
+  closeMealPicker();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && activeMealPicker) closeMealPicker();
+});
+
+window.addEventListener(
+  "scroll",
+  (e) => {
+    // Keep the panel correctly anchored through any scroll - including the
+    // browser's own focus-scroll-into-view when the pick button is opened
+    // near the edge of the horizontally-scrollable table. Closing here
+    // instead would make the panel vanish before it's ever seen.
+    if (!activeMealPicker) return;
+    if (mealPickerPanelEl.contains(e.target)) return;
+    positionMealPicker(activeMealPicker.anchorEl);
+  },
+  true
+);
+window.addEventListener("resize", () => {
+  if (activeMealPicker) positionMealPicker(activeMealPicker.anchorEl);
+});
+
 function renderWeekTable() {
   const plan = currentPlan();
   if (!plan) return;
@@ -441,61 +541,33 @@ function renderWeekTable() {
       const wrap = document.createElement("div");
       wrap.className = "cell-editor";
 
-      const select = document.createElement("select");
-      const blankOption = document.createElement("option");
-      blankOption.value = "";
-      blankOption.textContent = "— choose a meal —";
-      select.appendChild(blankOption);
-
-      const candidates = state.meals.filter(
-        (m) => mealFitsSlot(m, slot.key) && mealPassesFilters(m, plan.weekStart)
-      );
-      candidates.forEach((m) => {
-        const opt = document.createElement("option");
-        opt.value = m.id;
-        opt.textContent = m.name;
-        if (cellData.mealId === m.id) opt.selected = true;
-        select.appendChild(opt);
-      });
-
-      // Keep currently selected meal visible even if filtered out now
-      if (cellData.mealId && !candidates.some((m) => m.id === cellData.mealId)) {
-        const stale = state.meals.find((m) => m.id === cellData.mealId);
-        if (stale) {
-          const opt = document.createElement("option");
-          opt.value = stale.id;
-          opt.textContent = `${stale.name} (filtered)`;
-          opt.selected = true;
-          select.appendChild(opt);
-        }
-      }
-
       const textarea = document.createElement("textarea");
-      textarea.placeholder = "Type a meal, or pick one above";
+      textarea.placeholder = "Type a meal, or pick one below";
       textarea.value = cellData.text || "";
+      textarea.rows = 2;
 
-      select.addEventListener("change", () => {
-        const mealId = select.value || null;
-        const meal = mealId ? state.meals.find((m) => m.id === mealId) : null;
-        setCell(plan, key, { mealId, text: meal ? meal.name : "" });
-        if (meal) markMealUsed(meal, plan.weekStart);
-        textarea.value = meal ? meal.name : "";
+      const pickBtn = document.createElement("button");
+      pickBtn.type = "button";
+      pickBtn.className = "cell-pick-btn";
+      pickBtn.textContent = "Choose a meal ▾";
+
+      const pick = (meal) => {
+        setCell(plan, key, { mealId: meal.id, text: meal.name });
+        markMealUsed(meal, plan.weekStart);
+        textarea.value = meal.name;
+        closeMealPicker();
+      };
+
+      pickBtn.addEventListener("click", () => {
+        openMealPicker({ anchorEl: pickBtn, slotKey: slot.key, weekStart: plan.weekStart, onPick: pick });
       });
 
       textarea.addEventListener("input", () => {
-        setCell(plan, key, { mealId: cellData.mealId, text: textarea.value });
-      });
-      textarea.addEventListener("blur", () => {
-        // typing manually detaches from the specific meal record if it no longer matches
-        const current = plan.cells[key];
-        const linked = current.mealId ? state.meals.find((m) => m.id === current.mealId) : null;
-        if (linked && linked.name !== current.text) {
-          setCell(plan, key, { mealId: null, text: current.text });
-        }
+        setCell(plan, key, { mealId: null, text: textarea.value });
       });
 
-      wrap.appendChild(select);
       wrap.appendChild(textarea);
+      wrap.appendChild(pickBtn);
       td.appendChild(wrap);
       tr.appendChild(td);
     });
