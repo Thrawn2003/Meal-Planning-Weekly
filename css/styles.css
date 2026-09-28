@@ -8,23 +8,31 @@
   --beige: #ecdfc0;
   --beige-dark: #d8c69f;
   --brown: #8a6642;
-  --brown-dark: #5b3f2b;
+  --brown-dark: #6b4a34;
   --text-dark: #3a2e22;
   --white: #fffdf8;
   --danger: #a5432f;
   --danger-dark: #7e3121;
-  --shadow: rgba(58, 46, 34, 0.18);
+  --shadow: rgba(58, 46, 34, 0.12);
+  --shadow-soft: rgba(58, 46, 34, 0.08);
+  --font-heading: "Quicksand", "Segoe UI", sans-serif;
+  --font-body: "Nunito", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-body);
   background: var(--beige-light);
   color: var(--text-dark);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .navbar-brand, .btn, .nav-link {
+  font-family: var(--font-heading);
 }
 
 /* ===================== Navbar ===================== */
@@ -32,18 +40,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--brown-dark);
+  background: linear-gradient(135deg, var(--brown-dark), var(--brown));
   color: var(--beige-light);
   padding: 1rem 1.75rem;
   flex-wrap: wrap;
   gap: 0.75rem;
-  box-shadow: 0 2px 6px var(--shadow);
+  box-shadow: 0 3px 10px var(--shadow);
+  border-radius: 0 0 18px 18px;
 }
 
 .navbar-brand {
-  font-size: 1.5rem;
+  font-size: 1.55rem;
   font-weight: 700;
-  color: var(--beige-light);
+  color: var(--white);
 }
 
 .navbar-links {
@@ -53,25 +62,27 @@ body {
 }
 
 .nav-link {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
   border: 2px solid transparent;
   color: var(--beige-light);
-  padding: 0.65rem 1.25rem;
-  border-radius: 8px;
+  padding: 0.65rem 1.3rem;
+  border-radius: 999px;
   font-size: 1rem;
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .nav-link:hover {
-  background: var(--brown);
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .nav-link.active {
   background: var(--green);
   color: var(--white);
-  border-color: var(--green-dark);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* ===================== Layout ===================== */
@@ -87,7 +98,8 @@ main#app {
 .panel-heading h1 {
   color: var(--brown-dark);
   margin-bottom: 0.35rem;
-  font-size: 1.9rem;
+  font-size: 1.95rem;
+  font-weight: 700;
 }
 
 .hint {
@@ -99,14 +111,16 @@ main#app {
 /* ===================== Buttons ===================== */
 .btn {
   border: none;
-  border-radius: 8px;
-  padding: 0.7rem 1.35rem;
+  border-radius: 999px;
+  padding: 0.7rem 1.4rem;
   font-size: 0.98rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 0.05s ease, filter 0.15s ease;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
-.btn:active { transform: translateY(1px); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 5px 10px var(--shadow); }
+.btn:active { transform: translateY(0); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08); }
 
 .btn-primary { background: var(--green); color: var(--white); }
 .btn-primary:hover { background: var(--green-dark); }
@@ -120,7 +134,7 @@ main#app {
 .btn-danger { background: var(--danger); color: var(--white); }
 .btn-danger:hover { background: var(--danger-dark); }
 
-.btn-small { padding: 0.45rem 0.85rem; font-size: 0.88rem; }
+.btn-small { padding: 0.45rem 0.95rem; font-size: 0.88rem; }
 
 /* ===================== Calendar picker ===================== */
 .calendar-toolbar {
@@ -142,11 +156,11 @@ main#app {
 .cal-selection-status {
   background: var(--green-light);
   border: 1px solid var(--green);
-  border-radius: 8px;
-  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  padding: 0.7rem 1.1rem;
   margin-bottom: 1rem;
   color: var(--green-dark);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .year-calendar {
@@ -158,9 +172,15 @@ main#app {
 .mini-month {
   background: var(--white);
   border: 1px solid var(--beige-dark);
-  border-radius: 10px;
+  border-radius: 16px;
   padding: 0.85rem;
-  box-shadow: 0 1px 3px var(--shadow);
+  box-shadow: 0 2px 8px var(--shadow-soft);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.mini-month:hover {
+  box-shadow: 0 6px 16px var(--shadow);
+  transform: translateY(-2px);
 }
 
 .mini-month-title {
@@ -188,15 +208,17 @@ main#app {
 .mini-day {
   text-align: center;
   padding: 0.45rem 0;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   background: var(--beige-light);
   color: var(--text-dark);
   border: 1px solid transparent;
+  transition: background 0.12s ease, transform 0.12s ease;
 }
 
 .mini-day:hover {
   background: var(--green-light);
+  transform: scale(1.08);
 }
 
 .mini-day.empty {
@@ -233,7 +255,8 @@ main#app {
   color: var(--brown-dark);
   margin: 0;
   flex: 1 1 auto;
-  font-size: 1.7rem;
+  font-size: 1.75rem;
+  font-weight: 700;
 }
 
 .week-actions {
@@ -245,9 +268,10 @@ main#app {
 .filters-panel {
   background: var(--white);
   border: 1px solid var(--beige-dark);
-  border-radius: 8px;
+  border-radius: 14px;
   padding: 0.75rem 1.25rem;
   margin-bottom: 1.25rem;
+  box-shadow: 0 2px 8px var(--shadow-soft);
 }
 
 .filters-panel summary {
@@ -282,23 +306,28 @@ main#app {
   align-items: center;
   gap: 0.4rem;
   background: var(--beige);
-  border-radius: 14px;
-  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
   font-size: 0.9rem;
   cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.tag-chip-checkbox:hover {
+  background: var(--green-light);
 }
 
 #recency-filter {
   padding: 0.5rem 0.7rem;
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid var(--beige-dark);
   font-size: 0.95rem;
 }
 
 .table-scroll {
   overflow-x: auto;
-  border-radius: 10px;
-  box-shadow: 0 1px 4px var(--shadow);
+  border-radius: 14px;
+  box-shadow: 0 2px 10px var(--shadow-soft);
 }
 
 table.week-table {
@@ -359,17 +388,19 @@ table.week-table tbody tr:nth-child(even) td {
   width: 100%;
   resize: vertical;
   min-height: 3.2rem;
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid var(--beige-dark);
-  padding: 0.55rem;
+  padding: 0.55rem 0.65rem;
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.35;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .cell-editor textarea:focus {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-light);
 }
 
 .cell-pick-btn {
@@ -377,16 +408,18 @@ table.week-table tbody tr:nth-child(even) td {
   background: var(--beige);
   color: var(--brown-dark);
   border: 1px solid var(--beige-dark);
-  border-radius: 6px;
-  padding: 0.5rem 0.6rem;
+  border-radius: 999px;
+  padding: 0.5rem 0.7rem;
   font-size: 0.88rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
 }
 
 .cell-pick-btn:hover {
   background: var(--green-light);
   border-color: var(--green);
+  transform: translateY(-1px);
 }
 
 /* ---- Shared floating meal picker panel ---- */
@@ -395,10 +428,10 @@ table.week-table tbody tr:nth-child(even) td {
   z-index: 500;
   background: var(--white);
   border: 1px solid var(--beige-dark);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px var(--shadow);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px var(--shadow);
   overflow-y: auto;
-  padding: 0.4rem;
+  padding: 0.5rem;
 }
 
 .meal-picker-item {
@@ -407,13 +440,14 @@ table.week-table tbody tr:nth-child(even) td {
   text-align: left;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0.65rem 0.75rem;
   font-size: 0.95rem;
   color: var(--text-dark);
   cursor: pointer;
   white-space: normal;
   line-height: 1.35;
+  transition: background 0.1s ease;
 }
 
 .meal-picker-item:hover,
@@ -431,9 +465,9 @@ table.week-table tbody tr:nth-child(even) td {
 .card {
   background: var(--white);
   border: 1px solid var(--beige-dark);
-  border-radius: 10px;
+  border-radius: 18px;
   padding: 1.75rem;
-  box-shadow: 0 1px 4px var(--shadow);
+  box-shadow: 0 2px 10px var(--shadow-soft);
 }
 
 .meal-form .form-row {
@@ -443,10 +477,11 @@ table.week-table tbody tr:nth-child(even) td {
 .meal-form-heading {
   color: var(--green-dark);
   background: var(--green-light);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0.6rem 1rem;
   margin: 0 0 1.4rem;
   font-size: 1.05rem;
+  font-weight: 700;
 }
 
 .meal-form-actions {
@@ -464,10 +499,18 @@ table.week-table tbody tr:nth-child(even) td {
 
 .meal-form input[type="text"] {
   width: 100%;
-  padding: 0.7rem 0.8rem;
-  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
   border: 1px solid var(--beige-dark);
   font-size: 1rem;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.meal-form input[type="text"]:focus,
+.inline-add input:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-light);
 }
 
 .checkbox-grid {
@@ -481,10 +524,16 @@ table.week-table tbody tr:nth-child(even) td {
   align-items: center;
   gap: 0.4rem;
   background: var(--beige);
-  border-radius: 14px;
-  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
   cursor: pointer;
   font-size: 0.95rem;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.checkbox-chip:hover {
+  background: var(--green-light);
+  transform: translateY(-1px);
 }
 
 .checkbox-chip input:checked ~ span,
@@ -500,8 +549,8 @@ table.week-table tbody tr:nth-child(even) td {
 
 .inline-add input {
   flex: 1;
-  padding: 0.4rem;
-  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
   border: 1px solid var(--beige-dark);
 }
 
@@ -534,13 +583,20 @@ table.week-table tbody tr:nth-child(even) td {
 .meal-card {
   background: var(--white);
   border: 1px solid var(--beige-dark);
-  border-radius: 8px;
+  border-radius: 14px;
   padding: 1.1rem 1.3rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  box-shadow: 0 1px 4px var(--shadow-soft);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.meal-card:hover {
+  box-shadow: 0 4px 12px var(--shadow);
+  transform: translateY(-1px);
 }
 
 .meal-card-info strong {
@@ -558,18 +614,19 @@ table.week-table tbody tr:nth-child(even) td {
 .meal-card-meta .tag {
   display: inline-block;
   background: var(--beige);
-  border-radius: 10px;
-  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
   margin-right: 0.35rem;
 }
 
 .empty-state {
   text-align: center;
   color: var(--brown);
-  padding: 2rem;
+  padding: 2.25rem;
   background: var(--white);
-  border: 1px dashed var(--beige-dark);
-  border-radius: 10px;
+  border: 2px dashed var(--beige-dark);
+  border-radius: 16px;
+  font-size: 1.05rem;
 }
 
 /* ===================== All PDFs view ===================== */
@@ -582,13 +639,20 @@ table.week-table tbody tr:nth-child(even) td {
 .pdf-card {
   background: var(--white);
   border: 1px solid var(--beige-dark);
-  border-radius: 8px;
+  border-radius: 14px;
   padding: 1.1rem 1.3rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  box-shadow: 0 1px 4px var(--shadow-soft);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.pdf-card:hover {
+  box-shadow: 0 4px 12px var(--shadow);
+  transform: translateY(-1px);
 }
 
 .pdf-card-info strong {

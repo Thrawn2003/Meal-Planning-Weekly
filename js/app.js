@@ -268,9 +268,9 @@ function applySelectionHighlight(dayEl, dateObj) {
 
 function renderCalendarStatus() {
   if (!state.calendarFirstClick) {
-    calSelectionStatusEl.textContent = "Click a date to start choosing your week.";
+    calSelectionStatusEl.textContent = "👉 Click a date below to start choosing your week.";
   } else {
-    calSelectionStatusEl.textContent = `Start date selected: ${formatPretty(fromISODate(state.calendarFirstClick))}. Now click an end date (can be in the same week, or click the same date again to just use that week).`;
+    calSelectionStatusEl.textContent = `Great, starting ${formatPretty(fromISODate(state.calendarFirstClick))} 🎉 Now click an end date (or click that same date again to just use that week).`;
   }
 }
 
@@ -458,7 +458,7 @@ function openMealPicker({ anchorEl, weekStart, onPick }) {
   if (candidates.length === 0) {
     const empty = document.createElement("div");
     empty.className = "meal-picker-empty";
-    empty.textContent = "No meals fit here yet (check your filters, or add one on Add New Meal).";
+    empty.textContent = "Nothing to show here yet — check your filters, or add a meal on the Add New Meal tab. 🙂";
     mealPickerPanelEl.appendChild(empty);
   } else {
     candidates.forEach((m) => {
@@ -716,7 +716,7 @@ function renderPdfHistoryView() {
   pdfHistoryListEl.innerHTML = "";
 
   if (state.pdfHistory.length === 0) {
-    pdfHistoryListEl.innerHTML = `<div class="empty-state">No PDFs saved yet. From the Meal Planning tab, fill in a week and click "Save &amp; Print PDF".</div>`;
+    pdfHistoryListEl.innerHTML = `<div class="empty-state">📭 Nothing here yet! From the Meal Planning tab, fill in a week and click "Save &amp; Print PDF" to see it show up here.</div>`;
     return;
   }
 
@@ -951,7 +951,7 @@ function renderMealLibrary() {
   mealLibraryListEl.innerHTML = "";
 
   if (state.meals.length === 0) {
-    mealLibraryListEl.innerHTML = `<div class="empty-state">No meals yet. Add one above to get started.</div>`;
+    mealLibraryListEl.innerHTML = `<div class="empty-state">🍽️ No meals yet — add your first one above to get started!</div>`;
     return;
   }
 
