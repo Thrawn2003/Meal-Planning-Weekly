@@ -440,6 +440,20 @@ table.week-table tbody tr:nth-child(even) td {
   margin-bottom: 1.4rem;
 }
 
+.meal-form-heading {
+  color: var(--green-dark);
+  background: var(--green-light);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  margin: 0 0 1.4rem;
+  font-size: 1.05rem;
+}
+
+.meal-form-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
 .meal-form label {
   display: block;
   font-weight: 700;
@@ -509,6 +523,12 @@ table.week-table tbody tr:nth-child(even) td {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.meal-card-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .meal-card {

@@ -42,6 +42,7 @@ const STORAGE_KEYS = {
   filters: "mpw_filters",
   customTags: "mpw_custom_tags",
   currentWeekKey: "mpw_current_week_key",
+  oldDemoCleared: "mpw_old_demo_cleared",
 };
 
 // One-time cleanup for browsers that got the old placeholder meal library
@@ -52,6 +53,26 @@ function clearOldPlaceholderMealsIfPresent() {
   if (state.meals.length === 0) return;
   if (!state.meals.every((m) => typeof m.id === "string" && m.id.startsWith("seed_"))) return;
   state.meals = [];
+  persistMeals();
+}
+
+// Names from an even earlier "Load Example Meals" demo button (since
+// removed). Those meals got normal meal_... ids indistinguishable from a
+// real one by id alone, so this is a one-time, name-based sweep instead -
+// gated by a flag so it only ever runs once, and skips anything with a
+// lastUsed date (already incorporated into a real plan).
+const OLD_DEMO_MEAL_NAMES = new Set([
+  "Scrambled Eggs & Toast", "Oatmeal with Berries", "Pancakes", "Yogurt & Granola",
+  "Grilled Cheese & Soup", "Turkey Sandwich", "Chicken Caesar Salad", "Leftover Night",
+  "Chicken Nuggets & Veggies", "Mac and Cheese", "Spaghetti and Meatballs", "Tacos",
+  "Grilled Salmon & Rice", "Stir Fry Veggies & Tofu", "Roast Chicken & Potatoes",
+  "Avocado Toast", "Breakfast Burritos", "Homemade Pizza Night",
+]);
+
+function clearOldDemoMealsIfPresent() {
+  if (loadJSON(STORAGE_KEYS.oldDemoCleared, false)) return;
+  saveJSON(STORAGE_KEYS.oldDemoCleared, true);
+  state.meals = state.meals.filter((m) => !(OLD_DEMO_MEAL_NAMES.has(m.name) && !m.lastUsed));
   persistMeals();
 }
 
@@ -763,12 +784,52 @@ const mealSlotsCheckboxesEl = document.getElementById("meal-slots-checkboxes");
 const mealTagsCheckboxesEl = document.getElementById("meal-tags-checkboxes");
 const newTagInput = document.getElementById("new-tag-input");
 const mealLibraryListEl = document.getElementById("meal-library-list");
+const mealFormEl = document.getElementById("add-meal-form");
+const mealFormHeadingEl = document.getElementById("meal-form-heading");
+const mealFormHeadingNameEl = document.getElementById("meal-form-heading-name");
+const mealFormSubmitBtn = document.getElementById("meal-form-submit-btn");
+const mealFormCancelBtn = document.getElementById("meal-form-cancel-btn");
+
+let editingMealId = null;
 
 function renderAddMealView() {
+  // Leaving and coming back to this tab cancels any in-progress edit,
+  // since the checkbox DOM gets rebuilt from scratch below anyway.
+  if (editingMealId) stopEditingMeal();
   renderSlotCheckboxes();
   renderTagCheckboxes();
   renderMealLibrary();
 }
+
+function startEditingMeal(meal) {
+  editingMealId = meal.id;
+
+  mealNameInput.value = meal.name;
+  mealSlotsCheckboxesEl.querySelectorAll("input").forEach((cb) => {
+    cb.checked = (meal.slots || []).includes(cb.value);
+  });
+  mealTagsCheckboxesEl.querySelectorAll("input").forEach((cb) => {
+    cb.checked = (meal.tags || []).includes(cb.value);
+  });
+
+  mealFormHeadingNameEl.textContent = meal.name;
+  mealFormHeadingEl.classList.remove("hidden");
+  mealFormSubmitBtn.textContent = "Save Changes";
+  mealFormCancelBtn.classList.remove("hidden");
+
+  mealFormEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  mealNameInput.focus();
+}
+
+function stopEditingMeal() {
+  editingMealId = null;
+  mealFormEl.reset();
+  mealFormHeadingEl.classList.add("hidden");
+  mealFormSubmitBtn.textContent = "Add Meal";
+  mealFormCancelBtn.classList.add("hidden");
+}
+
+mealFormCancelBtn.addEventListener("click", stopEditingMeal);
 
 function renderSlotCheckboxes() {
   mealSlotsCheckboxesEl.innerHTML = "";
@@ -853,7 +914,7 @@ newTagInput.addEventListener("keydown", (e) => {
   }
 });
 
-document.getElementById("add-meal-form").addEventListener("submit", (e) => {
+mealFormEl.addEventListener("submit", (e) => {
   e.preventDefault();
   const name = mealNameInput.value.trim();
   if (!name) return;
@@ -861,19 +922,27 @@ document.getElementById("add-meal-form").addEventListener("submit", (e) => {
   const slots = Array.from(mealSlotsCheckboxesEl.querySelectorAll("input:checked")).map((cb) => cb.value);
   const tags = Array.from(mealTagsCheckboxesEl.querySelectorAll("input:checked")).map((cb) => cb.value);
 
-  state.meals.push({
-    id: `meal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    name,
-    slots,
-    tags,
-    lastUsed: null,
-    usageHistory: [],
-  });
-  persistMeals();
-
-  mealNameInput.value = "";
-  mealSlotsCheckboxesEl.querySelectorAll("input:checked").forEach((cb) => (cb.checked = false));
-  mealTagsCheckboxesEl.querySelectorAll("input:checked").forEach((cb) => (cb.checked = false));
+  if (editingMealId) {
+    const meal = state.meals.find((m) => m.id === editingMealId);
+    if (meal) {
+      meal.name = name;
+      meal.slots = slots;
+      meal.tags = tags;
+      persistMeals();
+    }
+    stopEditingMeal();
+  } else {
+    state.meals.push({
+      id: `meal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      slots,
+      tags,
+      lastUsed: null,
+      usageHistory: [],
+    });
+    persistMeals();
+    mealFormEl.reset();
+  }
 
   renderMealLibrary();
 });
@@ -908,18 +977,30 @@ function renderMealLibrary() {
 
       info.innerHTML = `<strong>${escapeHTML(meal.name)}</strong><div class="meal-card-meta">${metaBits.join(" ")}</div><div class="meal-card-meta">${escapeHTML(usedInfo)}</div>`;
 
+      const actions = document.createElement("div");
+      actions.className = "meal-card-actions";
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn btn-secondary btn-small";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => startEditingMeal(meal));
+
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "btn btn-danger btn-small";
       deleteBtn.textContent = "Delete";
       deleteBtn.addEventListener("click", () => {
         if (!confirm(`Delete "${meal.name}" from your meal library?`)) return;
+        if (editingMealId === meal.id) stopEditingMeal();
         state.meals = state.meals.filter((m) => m.id !== meal.id);
         persistMeals();
         renderMealLibrary();
       });
 
+      actions.appendChild(editBtn);
+      actions.appendChild(deleteBtn);
+
       card.appendChild(info);
-      card.appendChild(deleteBtn);
+      card.appendChild(actions);
       mealLibraryListEl.appendChild(card);
     });
 }
@@ -937,4 +1018,5 @@ document.getElementById("clear-meals-btn").addEventListener("click", () => {
    ===================================================================== */
 
 clearOldPlaceholderMealsIfPresent();
+clearOldDemoMealsIfPresent();
 showView("plan");

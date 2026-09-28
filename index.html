@@ -97,6 +97,7 @@
     </div>
 
     <form id="add-meal-form" class="card meal-form">
+      <h2 id="meal-form-heading" class="meal-form-heading hidden">Editing "<span id="meal-form-heading-name"></span>"</h2>
       <div class="form-row">
         <label for="meal-name">Meal name</label>
         <input type="text" id="meal-name" placeholder="e.g. Spaghetti and Meatballs" required>
@@ -116,8 +117,9 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <button type="submit" class="btn btn-primary">Add Meal</button>
+      <div class="form-row meal-form-actions">
+        <button type="submit" id="meal-form-submit-btn" class="btn btn-primary">Add Meal</button>
+        <button type="button" id="meal-form-cancel-btn" class="btn btn-secondary hidden">Cancel Edit</button>
       </div>
     </form>
 
