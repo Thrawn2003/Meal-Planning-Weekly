@@ -70,6 +70,7 @@ const PlannerEngine = (() => {
   function buildHistory(meals, plans, targetWeekStart, targetStartDay) {
     const idx = indexMeals(meals);
     const byMeal = new Map();
+    const cellMeal = new Map();
     const slotTotals = {};
     const varietyAgg = {};
     let earliestPast = Infinity;
@@ -97,6 +98,7 @@ const PlannerEngine = (() => {
         let rec = byMeal.get(meal.id);
         if (!rec) byMeal.set(meal.id, (rec = []));
         rec.push({ day, slotKey });
+        cellMeal.set(day + "|" + slotKey, meal);
         cells++;
         if (day < targetStartDay && day < earliestPast) earliestPast = day;
       });
@@ -116,6 +118,7 @@ const PlannerEngine = (() => {
 
     return {
       byMeal,
+      cellMeal,
       slotTotals,
       variety,
       cells,
@@ -159,8 +162,8 @@ const PlannerEngine = (() => {
     }
   }
 
-  function sharesCuisine(a, b) {
-    return !!a && !!b && CUISINES.some((c) => hasTag(a, c) && hasTag(b, c));
+  function sharesCuisine(a, b, skip) {
+    return !!a && !!b && CUISINES.some((c) => c !== skip && hasTag(a, c) && hasTag(b, c));
   }
 
   function scoreCandidate(meal, dayIdx, slotKey, ctx, S) {
@@ -175,6 +178,11 @@ const PlannerEngine = (() => {
     const hard = hasTag(meal, "High Effort");
     const parts = {};
     const info = { neverUsed: st.count === 0, pastGap: null, gap: null };
+    // A meal that dominates a habit slot (like the daily breakfast) is expected to repeat.
+    const habit = Math.min(1, S.popScore(meal, slotKey) * (1 - variety) * 2.2);
+    // The meal in the same slot on a neighboring day, reaching into adjacent saved weeks.
+    const neighborOf = (n) =>
+      (n >= 0 && n <= 6 ? ctx.assign.get(n + "|" + slotKey) : S.cellMeal.get(S.weekStartDay + n + "|" + slotKey)) || null;
 
     // How rested is it, relative to how often this meal normally comes around?
     // Earlier picks in this same week count as occurrences too.
@@ -225,7 +233,7 @@ const PlannerEngine = (() => {
       wdPart = conf * (st.weekdayCounts[wd] / st.count - 1 / 7) * 1.4;
       if (st.weekdayCounts[wd] === 0) {
         const topShare = Math.max(...st.weekdayCounts) / st.count;
-        const neverHere = Math.min(1, st.count / 7 / 3) * 0.8;
+        const neverHere = Math.min(1, st.count / 7 / 2);
         const dayBound = st.count >= 3 && topShare >= 0.75 ? 0.8 * conf : 0;
         wdPart -= Math.max(neverHere, dayBound);
       }
@@ -291,15 +299,29 @@ const PlannerEngine = (() => {
       });
     }
     [dayIdx - 1, dayIdx + 1].forEach((n) => {
-      if (sharesCuisine(meal, ctx.assign.get(n + "|" + slotKey))) mix -= dinner ? 0.3 : 0.15;
+      // Breakfasts handle South Asian vs. not in their own alternation rule below.
+      if (sharesCuisine(meal, neighborOf(n), time === "breakfast" ? "South Asian" : null)) mix -= dinner ? 0.3 : 0.15;
     });
     parts.mix = Math.max(mix, -1.6);
+
+    // Breakfasts: alternate and space out Indian (South Asian) and non-Indian days.
+    // Only when both kinds are available, and softened for habit meals and weekly rituals.
+    let alternate = 0;
+    if (time === "breakfast" && S.hasBothKinds(slotKey)) {
+      const indian = hasTag(meal, "South Asian");
+      const protectedBy = Math.max(habit, clamp((parts.weekday + parts.rhythm) / 1.6, 0, 1));
+      [dayIdx - 1, dayIdx + 1].forEach((n) => {
+        const nb = neighborOf(n);
+        if (!nb) return;
+        alternate += (hasTag(nb, "South Asian") === indian ? -1.0 : 0.4) * (1 - 0.85 * protectedBy);
+      });
+    }
+    parts.alternate = alternate;
 
     // Repeats within the week - tolerated in slots where this family repeats a lot.
     let repeat = 0;
     if (byTime) {
-      // A meal that dominates a habit slot (like the daily breakfast) is expected to repeat.
-      const dampen = 1 - 0.85 * Math.min(1, S.popScore(meal, slotKey) * (1 - variety) * 2.2);
+      const dampen = 1 - 0.85 * habit;
       const sameTime = [...(byTime.get(time) || [])].filter((d) => d !== dayIdx);
       if (sameTime.length) {
         let same = variety * (0.9 + 0.5 * (sameTime.length - 1));
@@ -342,6 +364,7 @@ const PlannerEngine = (() => {
       else found.push([parts.effort, "Nice for the weekend"]);
     }
     if (parts.kid >= 0.35) found.push([parts.kid, "Kid-friendly"]);
+    if (parts.alternate >= 0.35) found.push([parts.alternate, "Alternates Indian and non-Indian breakfasts"]);
     found.sort((a, b) => b[0] - a[0]);
     const reasons = found.slice(0, 3).map((f) => f[1]);
     if (!reasons.length) reasons.push("A good fit for this meal slot");
@@ -419,6 +442,11 @@ const PlannerEngine = (() => {
 
     const S = {
       weekStartDay,
+      cellMeal: H.cellMeal,
+      hasBothKinds: (slotKey) => {
+        const list = eligible[slotKey] || [];
+        return list.some((m) => hasTag(m, "South Asian")) && list.some((m) => !hasTag(m, "South Asian"));
+      },
       avoid: opts.avoid || {},
       stats,
       typical,

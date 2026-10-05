@@ -121,6 +121,49 @@ test("repeats a family habit slot and keeps a weekly ritual on its day", () => {
   assert.ok(picked.slice(0, 6).filter((n) => n === "Oatmeal").length >= 4, picked.join(","));
 });
 
+const INDIAN = "South Asian";
+const breakfasts = () => [
+  ...["Upma", "Paratha", "Anda", "Roti", "Daal"].map((n) => mk(n, [KB], [INDIAN])),
+  ...["Toast", "Cereal", "Bagel", "Pancakes", "Waffles"].map((n) => mk(n, [KB], ["American"])),
+];
+const isIndian = (meals, name) => meals.find((m) => m.name === name).tags.includes(INDIAN);
+
+test("alternates and spaces out Indian and non-Indian breakfasts", () => {
+  const meals = breakfasts();
+  for (let i = 0; i < 6; i++) {
+    const picked = names(run(meals, {}, plan(), { seed: "alt" + i }), KB);
+    assert.equal(picked.length, 7);
+    for (let d = 1; d < 7; d++) {
+      assert.notEqual(isIndian(meals, picked[d]), isIndian(meals, picked[d - 1]), "back-to-back same type: " + picked.join(","));
+    }
+  }
+});
+
+test("breakfast alternation works around boxes you filled by hand", () => {
+  const meals = breakfasts();
+  const manual = { [isoPlus(TARGET, 3) + "_" + KB]: { mealId: null, text: "Paratha" } };
+  const picked = run(meals, {}, plan(manual)).assignments.filter((a) => a.slotKey === KB);
+  const byDay = Object.fromEntries(picked.map((a) => [a.dayIdx, a.text]));
+  assert.ok(!isIndian(meals, byDay[2]) && !isIndian(meals, byDay[4]), JSON.stringify(byDay));
+});
+
+test("breakfast alternation continues from last week's Saturday", () => {
+  const meals = breakfasts();
+  const lastWeek = week("2026-09-27", { [KB]: [null, null, null, null, null, null, "Anda"] }, meals);
+  const picked = names(run(meals, { "2026-09-27": lastWeek }, plan()), KB);
+  assert.ok(!isIndian(meals, picked[0]), "Sunday after an Indian Saturday: " + picked.join(","));
+});
+
+test("alternation does not break a daily habit breakfast", () => {
+  const meals = [mk("Boiled Eggs", [PB]), mk("Special Anda", [PB], [INDIAN]), mk("Indian Oatmeal", [PB], [INDIAN]), mk("Toast", [PB])];
+  const habit = ["Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Indian Oatmeal", "Special Anda"];
+  const plans = {};
+  ["2026-09-27", "2026-09-20", "2026-09-13"].forEach((w) => (plans[w] = week(w, { [PB]: habit }, meals)));
+  const picked = names(run(meals, plans, plan()), PB);
+  assert.ok(picked.slice(0, 5).filter((n) => n === "Boiled Eggs").length >= 3, picked.join(","));
+  assert.equal(picked[6], "Special Anda");
+});
+
 test("limits takeout nights in a week", () => {
   const meals = [...dinners(6), ...["T1", "T2", "T3", "T4", "T5", "T6"].map((n) => mk(n, [KD], [TAKEOUT]))];
   for (let i = 0; i < 5; i++) {

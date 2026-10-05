@@ -39,6 +39,7 @@ It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, n
 - **Weekday and slot patterns**: a meal that's always eaten on Saturdays stays on Saturdays.
 - **Trends and seasonality**: meals you've been eating more lately, and what you ate around this time last year.
 - **A balanced week**: quick meals on busy weeknights, big cooking and takeout on relaxed days, at most two takeout nights, no back-to-back heavy-cooking days, a mix of proteins and cuisines, and no unwanted repeats.
+- **Alternating breakfasts**: Indian (tagged "South Asian") and non-Indian breakfasts are alternated and spaced out day to day — including from the end of last week and around boxes you filled by hand. Daily habit breakfasts and weekly rituals (like a Saturday special) are exempt, and it only applies when you have both kinds available for that breakfast slot.
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 
