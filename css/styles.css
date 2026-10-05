@@ -422,6 +422,46 @@ table.week-table tbody tr:nth-child(even) td {
   transform: translateY(-1px);
 }
 
+.cell-reason {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--green-dark);
+  cursor: help;
+}
+
+.autopop-status {
+  position: relative;
+  background: var(--green-light);
+  border: 1px solid var(--green);
+  border-radius: 14px;
+  padding: 0.9rem 3rem 0.9rem 1.2rem;
+  margin-bottom: 1.25rem;
+  color: var(--green-dark);
+  box-shadow: 0 2px 8px var(--shadow-soft);
+}
+
+.autopop-status p {
+  margin: 0.15rem 0;
+  font-weight: 700;
+}
+
+.autopop-status p.autopop-small {
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.autopop-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.7rem;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--green-dark);
+  cursor: pointer;
+}
+
 /* ---- Shared floating meal picker panel ---- */
 .meal-picker-panel {
   position: fixed;
@@ -670,7 +710,7 @@ table.week-table tbody tr:nth-child(even) td {
 
 @media print {
   .navbar, .calendar-toolbar, .cal-selection-status, #calendar-picker,
-  .week-header, .filters-panel, .table-scroll { display: none !important; }
+  .week-header, .filters-panel, .table-scroll, .autopop-status { display: none !important; }
 
   body, main#app { margin: 0; padding: 0; background: var(--white); }
 

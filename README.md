@@ -30,7 +30,19 @@ Filters apply to both the dropdown choices and the Auto-Populate button below.
 
 ## Auto-Populate
 
-Click **✨ Auto-Populate Week** to fill every *empty* box with a meal suitable for that row, preferring meals you (or auto-populate) haven't used recently — never-used meals are picked first, then the least-recently-used ones. It won't touch boxes you've already filled in. It also respects your active filters and tries not to repeat the same meal twice in one week when an alternative exists.
+Click **✨ Auto-Populate Week** to fill every *empty* box with the best-fitting meal. It never touches boxes you've already filled in, respects your active Filters, and shows a short ✨ note under each pick explaining why it was chosen (hover it for more).
+
+It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, no API, no accounts, no cost**; everything is calculated in your browser from your own saved weeks. For each box it scores every eligible meal on:
+
+- **How long since you last had it**, judged against how often that meal normally comes around (a weekly meal is "due" sooner than a once-a-month one). Meals you've never tried get a small exploration boost.
+- **Popularity and habits**: what your family eats most in that slot, learned per slot — so a daily breakfast can repeat all week while dinners stay varied.
+- **Weekday and slot patterns**: a meal that's always eaten on Saturdays stays on Saturdays.
+- **Trends and seasonality**: meals you've been eating more lately, and what you ate around this time last year.
+- **A balanced week**: quick meals on busy weeknights, big cooking and takeout on relaxed days, at most two takeout nights, no back-to-back heavy-cooking days, a mix of proteins and cuisines, and no unwanted repeats.
+
+It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
+
+To run the engine's tests: `node --test test/planner-engine.test.js` (Node 18+, no dependencies).
 
 ## Saving as a PDF
 

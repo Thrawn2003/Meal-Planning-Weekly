@@ -299,6 +299,7 @@ function handleCalendarDayClick(iso) {
     persistPlans();
   }
 
+  hideAutoPopStatus();
   state.currentWeekKey = weekKey;
   persistCurrentWeekKey();
   state.calendarFirstClick = null;
@@ -320,6 +321,7 @@ document.getElementById("cal-today").addEventListener("click", () => {
 });
 
 document.getElementById("change-week-btn").addEventListener("click", () => {
+  hideAutoPopStatus();
   state.currentWeekKey = null;
   persistCurrentWeekKey();
   state.calendarFirstClick = null;
@@ -561,10 +563,20 @@ function renderWeekTable() {
       pickBtn.className = "cell-pick-btn";
       pickBtn.textContent = "Choose a meal ▾";
 
+      const reasonEl = document.createElement("div");
+      reasonEl.className = "cell-reason";
+      if (cellData.why && cellData.why.length && cellData.text) {
+        reasonEl.textContent = "✨ " + cellData.why[0];
+        reasonEl.title = "Why this meal: " + cellData.why.join(" · ");
+      } else {
+        reasonEl.classList.add("hidden");
+      }
+
       const pick = (meal) => {
         setCell(plan, key, { mealId: meal.id, text: meal.name });
         markMealUsed(meal, plan.weekStart);
         textarea.value = meal.name;
+        reasonEl.classList.add("hidden");
         closeMealPicker();
       };
 
@@ -574,10 +586,12 @@ function renderWeekTable() {
 
       textarea.addEventListener("input", () => {
         setCell(plan, key, { mealId: null, text: textarea.value });
+        reasonEl.classList.add("hidden");
       });
 
       wrap.appendChild(textarea);
       wrap.appendChild(pickBtn);
+      wrap.appendChild(reasonEl);
       td.appendChild(wrap);
       tr.appendChild(td);
     });
@@ -611,43 +625,88 @@ document.getElementById("clear-week-btn").addEventListener("click", () => {
    Auto-Populate
    ===================================================================== */
 
+const autoPopStatusEl = document.getElementById("autopop-status");
+const autoPopStatusTextEl = document.getElementById("autopop-status-text");
+const autoRollCounts = new Map();
+const autoLastPicks = new Map();
+
+function hideAutoPopStatus() {
+  autoPopStatusEl.classList.add("hidden");
+}
+
+function showAutoPopStatus(lines) {
+  autoPopStatusTextEl.innerHTML = "";
+  lines.forEach(({ text, small }) => {
+    const p = document.createElement("p");
+    p.textContent = text;
+    if (small) p.className = "autopop-small";
+    autoPopStatusTextEl.appendChild(p);
+  });
+  autoPopStatusEl.classList.remove("hidden");
+}
+
+document.getElementById("autopop-status-close").addEventListener("click", hideAutoPopStatus);
+
 document.getElementById("auto-populate-btn").addEventListener("click", () => {
   const plan = currentPlan();
   if (!plan) return;
 
-  const usedThisWeek = new Set();
-  const dates = weekDates(plan);
+  // Running it again (e.g. after Clear Week) steers away from the last suggestion for the same boxes.
+  const roll = (autoRollCounts.get(plan.weekStart) || 0) + 1;
+  autoRollCounts.set(plan.weekStart, roll);
 
-  dates.forEach((d) => {
-    const dateISO = toISODate(d);
-    SLOTS.forEach((slot) => {
-      const key = cellKey(dateISO, slot.key);
-      const existing = plan.cells[key];
-      if (existing && existing.text && existing.text.trim() !== "") return; // don't overwrite filled cells
-
-      let candidates = state.meals.filter(
-        (m) => mealFitsSlot(m, slot.key) && mealPassesFilters(m, plan.weekStart)
-      );
-      if (candidates.length === 0) return;
-
-      let pool = candidates.filter((m) => !usedThisWeek.has(m.id));
-      if (pool.length === 0) pool = candidates;
-
-      pool.sort((a, b) => {
-        if (!a.lastUsed && !b.lastUsed) return 0;
-        if (!a.lastUsed) return -1;
-        if (!b.lastUsed) return 1;
-        return a.lastUsed.localeCompare(b.lastUsed);
-      });
-
-      const chosen = pool[0];
-      setCell(plan, key, { mealId: chosen.id, text: chosen.name });
-      markMealUsed(chosen, plan.weekStart);
-      usedThisWeek.add(chosen.id);
-    });
+  const result = PlannerEngine.planWeek({
+    meals: state.meals,
+    plans: state.plans,
+    plan,
+    slots: SLOTS,
+    isEligible: (m, slotKey) => mealFitsSlot(m, slotKey) && mealPassesFilters(m, plan.weekStart),
+    seed: `${plan.weekStart}#${roll}`,
+    avoid: autoLastPicks.get(plan.weekStart) || {},
   });
+  const picks = {};
+  result.assignments.forEach((a) => (picks[a.key] = a.mealId));
+  autoLastPicks.set(plan.weekStart, picks);
 
+  const usedIds = new Set();
+  result.assignments.forEach((a) => {
+    plan.cells[a.key] = { mealId: a.mealId, text: a.text, why: a.reasons };
+    usedIds.add(a.mealId);
+  });
+  state.meals.forEach((m) => {
+    if (!usedIds.has(m.id)) return;
+    m.lastUsed = plan.weekStart;
+    m.usageHistory = m.usageHistory || [];
+    if (!m.usageHistory.includes(plan.weekStart)) m.usageHistory.push(plan.weekStart);
+  });
+  persistPlans();
+  persistMeals();
   renderWeekTable();
+
+  const filled = result.assignments.length;
+  const skipped = result.skipped.length;
+  if (!filled && !skipped) {
+    showAutoPopStatus([{ text: "Every box in this week is already filled. Clear some boxes (or the whole week) and try again." }]);
+    return;
+  }
+  const lines = [];
+  if (filled) {
+    lines.push({ text: `✨ Filled ${filled} empty box${filled === 1 ? "" : "es"}. Boxes you'd already filled were left alone.` });
+    lines.push({
+      text: "Each pick weighs how long it's been since you last had it, what your family eats most, which days it usually lands on, and a balanced mix of effort, takeout and proteins. Look for the ✨ note under each meal to see why it was chosen.",
+      small: true,
+    });
+  }
+  if (skipped) {
+    lines.push({
+      text: `${skipped} box${skipped === 1 ? "" : "es"} had no eligible meal. Add meals for those slots, or loosen your filters.`,
+    });
+  }
+  if (filled && result.stats.historyCells < 20) {
+    lines.push({ text: "Tip: suggestions get smarter as you save more weeks of your own meals.", small: true });
+  }
+  lines.push({ text: "Calculated right here in your browser: free, private, and no AI.", small: true });
+  showAutoPopStatus(lines);
 });
 
 /* =====================================================================
