@@ -39,11 +39,13 @@ It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, n
 - **Weekday and slot patterns**: a meal that's always eaten on Saturdays stays on Saturdays.
 - **Trends and seasonality**: meals you've been eating more lately, and what you ate around this time last year.
 - **A balanced week**: quick meals on busy weeknights, big cooking and takeout on relaxed days, at most two takeout nights, no back-to-back heavy-cooking days, a mix of proteins and cuisines, and no unwanted repeats.
-- **Alternating breakfasts**: Indian (tagged "South Asian") and non-Indian breakfasts are alternated and spaced out day to day — including from the end of last week and around boxes you filled by hand. Daily habit breakfasts and weekly rituals (like a Saturday special) are exempt, and it only applies when you have both kinds available for that breakfast slot.
+- **Alternating, balanced breakfasts**: Indian and non-Indian breakfasts are alternated and spaced out day to day (including from the end of last week and around boxes you filled by hand), and each week keeps the family's usual mix, so "haven't had it in a while" can't tip it to all one kind. Weekly rituals (like a Saturday special) are exempt, and it only applies when both kinds are available for that slot. Cuisine and protein are recognized from the meal's name when a meal has no tag for them.
+
+**Parents Breakfast and Parents Lunch** aren't varied: they repeat your usual for each weekday (what you had on that weekday in most of your recent saved weeks, or the routine you saved with **📌 Save this week as my routine**). **Parents Dinner** boxes you've already filled are never touched, and count toward the week's variety.
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 
-To run the engine's tests: `node --test test/planner-engine.test.js` (Node 18+, no dependencies).
+To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js` (Node 18+, no dependencies).
 
 ## Saving as a PDF
 
@@ -51,17 +53,17 @@ Click **🖨️ Save & Print PDF** on a filled-in week. This adds the week to **
 
 ## Categories (tags)
 
-Default tags cover common ways to filter a weekly plan:
+The tags are grouped, and every one of them is something the planner or the filters actually use:
 
-- **Effort / time**: Quick, Low Effort, High Effort, Meal-Prep Friendly, One-Pot
-- **Nutrition / diet**: Healthy, Carby, Low-Carb, Vegetarian, Vegan, Gluten-Free, Dairy-Free
-- **Main protein**: Chicken, Beef, Pork, Seafood, Meatless
-- **Practicality**: Leftover-Friendly, Freezer-Friendly, Kid-Favorite, Picky-Eater-Safe
-- **Cost / occasion**: Budget-Friendly, Takeout / Restaurant Night, Weekend / Special
-- **Cuisine**: South Asian, American, Italian, Mexican, Chinese, Other Cuisine
-- **Other**: Spicy, Seasonal, New Recipe
+- **Cuisine**: Indian, American, Italian, Mexican, Chinese, Other Cuisine
+- **Main protein**: Chicken, Beef, Lamb / Goat, Pork, Seafood, Eggs, Vegetarian
+- **Effort**: Quick, Low Effort, High Effort
+- **Diet**: Carby, Healthy, Gluten-Free, Dairy-Free
+- **Occasion & family**: Kid-Favorite, Spicy, Takeout / Restaurant Night, Weekend / Special, New Recipe
 
-Add your own custom tags from the "+ Add Tag" box on the Add New Meal page. Custom tags (not the defaults above) can be removed with the "×" next to them — removing one strips it from any meals that had it.
+When you type a meal's name, the Add New Meal page suggests the cuisine, protein and takeout tags it makes obvious (one click to apply). Add your own tags from the "+ Add Tag" box; tags you added (not the built-in ones) can be removed with the "×" next to them, which also strips them from any meals that had them.
+
+Older versions had vaguer tags. They're converted automatically the first time you open the app: South Asian → Indian, Meatless/Vegan → Vegetarian, One-Pot → Low Effort, Picky-Eater-Safe → Kid-Favorite; Meal-Prep Friendly, Low-Carb, Leftover-Friendly, Freezer-Friendly, Budget-Friendly and Seasonal are retired. A meal missing a cuisine or protein tag gets the one its name makes obvious (existing tags are never overridden). Any leftover placeholder or demo meals from earlier versions are also removed, along with boxes that had been filled from them.
 
 ## Meals
 

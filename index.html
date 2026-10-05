@@ -62,6 +62,18 @@
         <button type="button" id="autopop-status-close" class="autopop-close" aria-label="Dismiss">&times;</button>
       </div>
 
+      <details class="filters-panel routine-panel" id="routine-panel">
+        <summary>📌 Parents' usual routine (Auto-Populate repeats it)</summary>
+        <div class="routine-body">
+          <p class="routine-help">Parents Breakfast and Parents Lunch are repeated the way you usually have them. Auto-Populate learns this from your saved weeks, or you can save this week's as your routine.</p>
+          <div id="routine-summary" class="routine-summary"></div>
+          <div class="routine-actions">
+            <button type="button" id="routine-save-btn" class="btn btn-secondary btn-small">Save this week as my routine</button>
+            <button type="button" id="routine-forget-btn" class="btn btn-secondary btn-small hidden">Forget saved routine</button>
+          </div>
+        </div>
+      </details>
+
       <details class="filters-panel" id="filters-panel">
         <summary>Filters (hide certain meals from dropdowns &amp; auto-populate)</summary>
         <div class="filters-body">
@@ -109,6 +121,7 @@
       <div class="form-row">
         <label for="meal-name">Meal name</label>
         <input type="text" id="meal-name" placeholder="e.g. Spaghetti and Meatballs" required>
+        <div id="tag-suggest" class="tag-suggest hidden" aria-live="polite"></div>
       </div>
 
       <div class="form-row">
@@ -152,6 +165,7 @@
 
 </main>
 
+<script src="js/tag-tools.js"></script>
 <script src="js/planner-engine.js"></script>
 <script src="js/app.js"></script>
 </body>

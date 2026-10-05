@@ -15,23 +15,6 @@ const SLOTS = [
   { key: "parents-dinner", label: "Parents Dinner" },
 ];
 
-const DEFAULT_TAGS = [
-  // Effort / time
-  "Quick", "Low Effort", "High Effort", "Meal-Prep Friendly", "One-Pot",
-  // Nutrition / diet
-  "Healthy", "Carby", "Low-Carb", "Vegetarian", "Vegan", "Gluten-Free", "Dairy-Free",
-  // Main protein
-  "Chicken", "Beef", "Pork", "Seafood", "Meatless",
-  // Practicality
-  "Leftover-Friendly", "Freezer-Friendly", "Kid-Favorite", "Picky-Eater-Safe",
-  // Cost / occasion
-  "Budget-Friendly", "Takeout / Restaurant Night", "Weekend / Special",
-  // Cuisine
-  "South Asian", "American", "Italian", "Mexican", "Chinese", "Other Cuisine",
-  // Other
-  "Spicy", "Seasonal", "New Recipe",
-];
-
 const DOW_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -42,38 +25,74 @@ const STORAGE_KEYS = {
   filters: "mpw_filters",
   customTags: "mpw_custom_tags",
   currentWeekKey: "mpw_current_week_key",
-  oldDemoCleared: "mpw_old_demo_cleared",
+  phantomCleanup: "mpw_phantom_cleanup_v2",
+  tagsV2: "mpw_tags_v2",
+  routine: "mpw_routine",
 };
 
-// One-time cleanup for browsers that got the old placeholder meal library
-// (every meal's id started with "seed_"). Only clears if EVERY meal is
-// still an untouched placeholder, so nothing the user actually added is
-// ever at risk of being wiped.
-function clearOldPlaceholderMealsIfPresent() {
-  if (state.meals.length === 0) return;
-  if (!state.meals.every((m) => typeof m.id === "string" && m.id.startsWith("seed_"))) return;
-  state.meals = [];
+const DEFAULT_TAGS = TagTools.ALL;
+
+/* ---------------------- One-time cleanups for older data ---------------------- */
+
+// Meals that were never the user's: the early "Load Example Meals" demo, matched by exact
+// name + slots + tags so a real meal that merely shares a name is left alone.
+const OLD_DEMO_MEALS = [
+  ["Scrambled Eggs & Toast", ["kids-breakfast", "parents-breakfast"], ["Quick", "Kid-Favorite"]],
+  ["Oatmeal with Berries", ["kids-breakfast", "parents-breakfast"], ["Healthy", "Quick"]],
+  ["Pancakes", ["kids-breakfast", "parents-breakfast"], ["Carby", "Kid-Favorite"]],
+  ["Yogurt & Granola", ["kids-breakfast", "parents-breakfast"], ["Quick", "Healthy"]],
+  ["Grilled Cheese & Soup", ["namath-lunch"], ["Carby", "Kid-Favorite", "Quick"]],
+  ["Turkey Sandwich", ["namath-lunch"], ["Quick", "Low Effort"]],
+  ["Chicken Caesar Salad", ["namath-lunch"], ["Healthy"]],
+  ["Leftover Night", ["namath-lunch", "parents-lunch", "parents-dinner"], ["Low Effort", "Quick"]],
+  ["Chicken Nuggets & Veggies", ["kids-dinner"], ["Kid-Favorite", "Quick"]],
+  ["Mac and Cheese", ["kids-dinner"], ["Carby", "Kid-Favorite", "High Effort"]],
+  ["Spaghetti and Meatballs", ["kids-dinner", "parents-dinner"], ["Carby", "High Effort", "Kid-Favorite"]],
+  ["Tacos", ["kids-dinner", "parents-dinner"], ["Kid-Favorite", "Quick"]],
+  ["Grilled Salmon & Rice", ["parents-dinner"], ["Healthy", "High Effort"]],
+  ["Stir Fry Veggies & Tofu", ["parents-lunch", "parents-dinner"], ["Healthy"]],
+  ["Roast Chicken & Potatoes", ["parents-dinner"], ["High Effort"]],
+  ["Avocado Toast", ["parents-breakfast"], ["Healthy", "Quick"]],
+  ["Breakfast Burritos", ["kids-breakfast", "parents-breakfast"], ["Carby", "High Effort"]],
+  ["Homemade Pizza Night", ["kids-dinner", "parents-dinner"], ["Carby", "High Effort", "Kid-Favorite"]],
+];
+
+const sameItems = (a, b) => a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
+
+// Removes the placeholder import (ids start with "seed_") and the demo meals above, wherever they
+// are in the library and whether or not they were used, plus any box that was filled from them.
+function removePhantomMeals() {
+  if (loadJSON(STORAGE_KEYS.phantomCleanup, false)) return;
+  saveJSON(STORAGE_KEYS.phantomCleanup, true);
+  const isPhantom = (m) =>
+    (typeof m.id === "string" && m.id.startsWith("seed_")) ||
+    OLD_DEMO_MEALS.some(([n, s, t]) => m.name === n && sameItems(m.slots || [], s) && sameItems(m.tags || [], t));
+  const removed = new Set(state.meals.filter(isPhantom).map((m) => m.id));
+  if (!removed.size) return;
+  state.meals = state.meals.filter((m) => !removed.has(m.id));
+  Object.values(state.plans).forEach((p) => {
+    Object.keys((p && p.cells) || {}).forEach((k) => {
+      if (p.cells[k] && removed.has(p.cells[k].mealId)) delete p.cells[k];
+    });
+  });
   persistMeals();
+  persistPlans();
 }
 
-// Names from an even earlier "Load Example Meals" demo button (since
-// removed). Those meals got normal meal_... ids indistinguishable from a
-// real one by id alone, so this is a one-time, name-based sweep instead -
-// gated by a flag so it only ever runs once, and skips anything with a
-// lastUsed date (already incorporated into a real plan).
-const OLD_DEMO_MEAL_NAMES = new Set([
-  "Scrambled Eggs & Toast", "Oatmeal with Berries", "Pancakes", "Yogurt & Granola",
-  "Grilled Cheese & Soup", "Turkey Sandwich", "Chicken Caesar Salad", "Leftover Night",
-  "Chicken Nuggets & Veggies", "Mac and Cheese", "Spaghetti and Meatballs", "Tacos",
-  "Grilled Salmon & Rice", "Stir Fry Veggies & Tofu", "Roast Chicken & Potatoes",
-  "Avocado Toast", "Breakfast Burritos", "Homemade Pizza Night",
-]);
-
-function clearOldDemoMealsIfPresent() {
-  if (loadJSON(STORAGE_KEYS.oldDemoCleared, false)) return;
-  saveJSON(STORAGE_KEYS.oldDemoCleared, true);
-  state.meals = state.meals.filter((m) => !(OLD_DEMO_MEAL_NAMES.has(m.name) && !m.lastUsed));
+// Renames/drops the older, vaguer tags and fills in a missing cuisine/protein from the meal's name.
+function migrateTagsV2() {
+  if (loadJSON(STORAGE_KEYS.tagsV2, false)) return;
+  saveJSON(STORAGE_KEYS.tagsV2, true);
+  const out = TagTools.migrateLibrary({
+    meals: state.meals,
+    customTags: state.customTags,
+    excludedTags: state.filters.excludedTags,
+  });
+  state.customTags = out.customTags;
+  state.filters.excludedTags = out.excludedTags;
   persistMeals();
+  persistCustomTags();
+  persistFilters();
 }
 
 /* ---------------------- Storage helpers ---------------------- */
@@ -104,6 +123,7 @@ const state = {
   pdfHistory: loadJSON(STORAGE_KEYS.pdfHistory, []), // [{weekKey, title, savedAt}]
   filters: loadJSON(STORAGE_KEYS.filters, { excludedTags: [], recencyWeeks: 0 }),
   customTags: loadJSON(STORAGE_KEYS.customTags, []),
+  routine: loadJSON(STORAGE_KEYS.routine, {}), // { slotKey: [7 x {mealId, text} | null], by weekday Sun..Sat }
   calendarYear: new Date().getFullYear(),
   calendarFirstClick: null, // ISO date string
   currentWeekKey: loadJSON(STORAGE_KEYS.currentWeekKey, null),
@@ -114,13 +134,26 @@ function persistPlans() { saveJSON(STORAGE_KEYS.plans, state.plans); }
 function persistPdfHistory() { saveJSON(STORAGE_KEYS.pdfHistory, state.pdfHistory); }
 function persistFilters() { saveJSON(STORAGE_KEYS.filters, state.filters); }
 function persistCustomTags() { saveJSON(STORAGE_KEYS.customTags, state.customTags); }
+function persistRoutine() { saveJSON(STORAGE_KEYS.routine, state.routine); }
 function persistCurrentWeekKey() { saveJSON(STORAGE_KEYS.currentWeekKey, state.currentWeekKey); }
 
+// The built-in tag groups, plus a group for any tag the user (or an imported recipe) added.
+function tagGroups() {
+  const known = new Set(DEFAULT_TAGS);
+  const extra = new Set(state.customTags);
+  state.meals.forEach((m) => (m.tags || []).forEach((t) => !known.has(t) && extra.add(t)));
+  const groups = TagTools.GROUPS.map((g) => ({ name: g.name, tags: g.tags.slice() }));
+  if (extra.size) groups.push({ name: "Your own tags", tags: [...extra].sort() });
+  return groups;
+}
+
 function allTags() {
-  const fromMeals = new Set();
-  state.meals.forEach((m) => (m.tags || []).forEach((t) => fromMeals.add(t)));
-  const merged = new Set([...DEFAULT_TAGS, ...state.customTags, ...fromMeals]);
-  return Array.from(merged).sort();
+  return tagGroups().flatMap((g) => g.tags);
+}
+
+// Meals as the planner should see them: a missing cuisine/protein tag is filled from the name.
+function plannerMeals() {
+  return state.meals.map(TagTools.withInferredTags);
 }
 
 /* ---------------------- Date helpers ---------------------- */
@@ -337,26 +370,38 @@ const recencyFilterEl = document.getElementById("recency-filter");
 
 function renderFilters() {
   tagFilterListEl.innerHTML = "";
-  allTags().forEach((tag) => {
-    const label = document.createElement("label");
-    label.className = "tag-chip-checkbox";
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = state.filters.excludedTags.includes(tag);
-    cb.addEventListener("change", () => {
-      if (cb.checked) {
-        if (!state.filters.excludedTags.includes(tag)) state.filters.excludedTags.push(tag);
-      } else {
-        state.filters.excludedTags = state.filters.excludedTags.filter((t) => t !== tag);
-      }
-      persistFilters();
-      renderWeekTable();
+  tagGroups().forEach((group) => {
+    const wrap = document.createElement("div");
+    wrap.className = "tag-group";
+    const title = document.createElement("div");
+    title.className = "tag-group-title";
+    title.textContent = group.name;
+    const row = document.createElement("div");
+    row.className = "tag-chip-row";
+    group.tags.forEach((tag) => {
+      const label = document.createElement("label");
+      label.className = "tag-chip-checkbox";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = state.filters.excludedTags.includes(tag);
+      cb.addEventListener("change", () => {
+        if (cb.checked) {
+          if (!state.filters.excludedTags.includes(tag)) state.filters.excludedTags.push(tag);
+        } else {
+          state.filters.excludedTags = state.filters.excludedTags.filter((t) => t !== tag);
+        }
+        persistFilters();
+        renderWeekTable();
+      });
+      label.appendChild(cb);
+      const span = document.createElement("span");
+      span.textContent = tag;
+      label.appendChild(span);
+      row.appendChild(label);
     });
-    label.appendChild(cb);
-    const span = document.createElement("span");
-    span.textContent = tag;
-    label.appendChild(span);
-    tagFilterListEl.appendChild(label);
+    wrap.appendChild(title);
+    wrap.appendChild(row);
+    tagFilterListEl.appendChild(wrap);
   });
 
   recencyFilterEl.value = String(state.filters.recencyWeeks || 0);
@@ -368,9 +413,12 @@ recencyFilterEl.addEventListener("change", () => {
   renderWeekTable();
 });
 
+function mealPassesTagFilters(meal) {
+  return !(meal.tags || []).some((t) => state.filters.excludedTags.includes(t));
+}
+
 function mealPassesFilters(meal, weekStartISO) {
-  const tags = meal.tags || [];
-  if (tags.some((t) => state.filters.excludedTags.includes(t))) return false;
+  if (!mealPassesTagFilters(meal)) return false;
 
   if (state.filters.recencyWeeks > 0 && meal.lastUsed) {
     const weekStart = fromISODate(weekStartISO);
@@ -598,6 +646,7 @@ function renderWeekTable() {
 
     weekTableBodyEl.appendChild(tr);
   });
+  renderRoutinePanel();
 }
 
 function setCell(plan, key, data) {
@@ -656,11 +705,14 @@ document.getElementById("auto-populate-btn").addEventListener("click", () => {
   autoRollCounts.set(plan.weekStart, roll);
 
   const result = PlannerEngine.planWeek({
-    meals: state.meals,
+    meals: plannerMeals(),
     plans: state.plans,
     plan,
     slots: SLOTS,
     isEligible: (m, slotKey) => mealFitsSlot(m, slotKey) && mealPassesFilters(m, plan.weekStart),
+    // Usual parents breakfast/lunch ignore the "recently used" filter (they repeat by design) but not tag filters.
+    routine: state.routine,
+    routineOk: mealPassesTagFilters,
     seed: `${plan.weekStart}#${roll}`,
     avoid: autoLastPicks.get(plan.weekStart) || {},
   });
@@ -691,9 +743,12 @@ document.getElementById("auto-populate-btn").addEventListener("click", () => {
   }
   const lines = [];
   if (filled) {
-    lines.push({ text: `✨ Filled ${filled} empty box${filled === 1 ? "" : "es"}. Boxes you'd already filled were left alone.` });
+    lines.push({ text: `✨ Filled ${filled} empty box${filled === 1 ? "" : "es"}. Boxes you'd already filled (including Parents Dinner) were left alone.` });
+    if (result.stats.routine) {
+      lines.push({ text: `📌 ${result.stats.routine} Parents Breakfast/Lunch box${result.stats.routine === 1 ? "" : "es"} repeat your usual routine.`, small: true });
+    }
     lines.push({
-      text: "Each pick weighs how long it's been since you last had it, what your family eats most, which days it usually lands on, and a balanced mix of effort, takeout and proteins. Look for the ✨ note under each meal to see why it was chosen.",
+      text: "The other picks weigh how long it's been since you last had each meal, what your family eats most, which days it usually lands on, a balance of Indian and non-Indian breakfasts, and a balanced mix of effort, takeout and proteins. Look for the ✨ note under each meal to see why it was chosen.",
       small: true,
     });
   }
@@ -707,6 +762,66 @@ document.getElementById("auto-populate-btn").addEventListener("click", () => {
   }
   lines.push({ text: "Calculated right here in your browser: free, private, and no AI.", small: true });
   showAutoPopStatus(lines);
+});
+
+/* ---------------------- Parents' usual routine ---------------------- */
+
+const ROUTINE_LABELS = { "parents-breakfast": "Breakfast", "parents-lunch": "Lunch" };
+const routineSummaryEl = document.getElementById("routine-summary");
+const routineForgetBtn = document.getElementById("routine-forget-btn");
+
+function renderRoutinePanel() {
+  const saved = Object.keys(ROUTINE_LABELS).filter((k) => state.routine[k] && state.routine[k].some(Boolean));
+  routineSummaryEl.innerHTML = "";
+  if (!saved.length) {
+    const p = document.createElement("p");
+    p.className = "routine-none";
+    p.textContent = "No saved routine yet: Auto-Populate uses what you usually have on each weekday in your saved weeks.";
+    routineSummaryEl.appendChild(p);
+  }
+  saved.forEach((k) => {
+    const p = document.createElement("p");
+    const label = document.createElement("strong");
+    label.textContent = ROUTINE_LABELS[k] + ": ";
+    const days = state.routine[k]
+      .map((entry, d) => (entry ? `${DOW_NAMES[d].slice(0, 3)} ${entry.text}` : null))
+      .filter(Boolean)
+      .join(" · ");
+    p.appendChild(label);
+    p.appendChild(document.createTextNode(days));
+    routineSummaryEl.appendChild(p);
+  });
+  routineForgetBtn.classList.toggle("hidden", !saved.length);
+}
+
+document.getElementById("routine-save-btn").addEventListener("click", () => {
+  const plan = currentPlan();
+  if (!plan) return;
+  const dates = weekDates(plan);
+  const next = {};
+  Object.keys(ROUTINE_LABELS).forEach((k) => {
+    const entries = dates.map((d) => {
+      const c = plan.cells[cellKey(toISODate(d), k)];
+      const text = c && c.text ? c.text.trim() : "";
+      return text ? { mealId: c.mealId || null, text } : null;
+    });
+    if (entries.some(Boolean)) next[k] = entries;
+  });
+  if (!Object.keys(next).length) {
+    showAutoPopStatus([{ text: "Fill in some Parents Breakfast or Parents Lunch boxes first, then save them as your routine." }]);
+    return;
+  }
+  state.routine = { ...state.routine, ...next };
+  persistRoutine();
+  renderRoutinePanel();
+  showAutoPopStatus([{ text: "📌 Saved. From now on Auto-Populate repeats these Parents Breakfast/Lunch boxes for each weekday." }]);
+});
+
+routineForgetBtn.addEventListener("click", () => {
+  state.routine = {};
+  persistRoutine();
+  renderRoutinePanel();
+  showAutoPopStatus([{ text: "Saved routine cleared. Auto-Populate goes back to learning it from your saved weeks." }]);
 });
 
 /* =====================================================================
@@ -870,6 +985,7 @@ function startEditingMeal(meal) {
   mealTagsCheckboxesEl.querySelectorAll("input").forEach((cb) => {
     cb.checked = (meal.tags || []).includes(cb.value);
   });
+  renderTagSuggestions();
 
   mealFormHeadingNameEl.textContent = meal.name;
   mealFormHeadingEl.classList.remove("hidden");
@@ -889,6 +1005,7 @@ function stopEditingMeal() {
 }
 
 mealFormCancelBtn.addEventListener("click", stopEditingMeal);
+mealFormEl.addEventListener("reset", () => setTimeout(renderTagSuggestions, 0));
 
 function renderSlotCheckboxes() {
   mealSlotsCheckboxesEl.innerHTML = "";
@@ -908,36 +1025,81 @@ function renderSlotCheckboxes() {
 }
 
 function renderTagCheckboxes() {
+  // Re-rendering (e.g. after adding a tag) must not lose what's already ticked.
+  const ticked = new Set(Array.from(mealTagsCheckboxesEl.querySelectorAll("input:checked")).map((cb) => cb.value));
   mealTagsCheckboxesEl.innerHTML = "";
-  allTags().forEach((tag) => {
-    const label = document.createElement("label");
-    label.className = "checkbox-chip";
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.value = tag;
-    cb.name = "tag";
-    label.appendChild(cb);
-    const span = document.createElement("span");
-    span.textContent = tag;
-    label.appendChild(span);
+  tagGroups().forEach((group) => {
+    const wrap = document.createElement("div");
+    wrap.className = "tag-group";
+    const title = document.createElement("div");
+    title.className = "tag-group-title";
+    title.textContent = group.name;
+    const row = document.createElement("div");
+    row.className = "checkbox-grid";
+    group.tags.forEach((tag) => {
+      const label = document.createElement("label");
+      label.className = "checkbox-chip";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = tag;
+      cb.name = "tag";
+      cb.checked = ticked.has(tag);
+      label.appendChild(cb);
+      const span = document.createElement("span");
+      span.textContent = tag;
+      label.appendChild(span);
 
-    if (state.customTags.includes(tag)) {
-      const removeBtn = document.createElement("span");
-      removeBtn.textContent = " ×";
-      removeBtn.title = `Remove custom tag "${tag}"`;
-      removeBtn.style.cursor = "pointer";
-      removeBtn.style.fontWeight = "700";
-      removeBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        removeCustomTag(tag);
-      });
-      label.appendChild(removeBtn);
-    }
+      if (!DEFAULT_TAGS.includes(tag)) {
+        const removeBtn = document.createElement("span");
+        removeBtn.textContent = " ×";
+        removeBtn.title = `Remove the tag "${tag}"`;
+        removeBtn.style.cursor = "pointer";
+        removeBtn.style.fontWeight = "700";
+        removeBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          removeCustomTag(tag);
+        });
+        label.appendChild(removeBtn);
+      }
+      row.appendChild(label);
+    });
+    wrap.appendChild(title);
+    wrap.appendChild(row);
+    mealTagsCheckboxesEl.appendChild(wrap);
+  });
+  renderTagSuggestions();
+}
 
-    mealTagsCheckboxesEl.appendChild(label);
+// Offers tags that the meal's name makes obvious (cuisine, main protein, takeout) as one-click chips.
+const tagSuggestEl = document.getElementById("tag-suggest");
+
+function renderTagSuggestions() {
+  const ticked = new Set(Array.from(mealTagsCheckboxesEl.querySelectorAll("input:checked")).map((cb) => cb.value));
+  const ideas = TagTools.suggestTags(mealNameInput.value).filter((t) => !ticked.has(t));
+  tagSuggestEl.innerHTML = "";
+  tagSuggestEl.classList.toggle("hidden", ideas.length === 0);
+  if (!ideas.length) return;
+  const label = document.createElement("span");
+  label.className = "tag-suggest-label";
+  label.textContent = "Suggested from the name:";
+  tagSuggestEl.appendChild(label);
+  ideas.forEach((tag) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tag-suggest-chip";
+    btn.textContent = "+ " + tag;
+    btn.addEventListener("click", () => {
+      const cb = Array.from(mealTagsCheckboxesEl.querySelectorAll("input")).find((c) => c.value === tag);
+      if (cb) cb.checked = true;
+      renderTagSuggestions();
+    });
+    tagSuggestEl.appendChild(btn);
   });
 }
+
+mealNameInput.addEventListener("input", renderTagSuggestions);
+mealTagsCheckboxesEl.addEventListener("change", renderTagSuggestions);
 
 function removeCustomTag(tag) {
   if (!confirm(`Remove the custom tag "${tag}"? It will be removed from any meals that have it.`)) return;
@@ -1076,6 +1238,6 @@ document.getElementById("clear-meals-btn").addEventListener("click", () => {
    Init
    ===================================================================== */
 
-clearOldPlaceholderMealsIfPresent();
-clearOldDemoMealsIfPresent();
+removePhantomMeals();
+migrateTagsV2();
 showView("plan");

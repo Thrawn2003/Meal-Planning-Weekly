@@ -4,9 +4,12 @@
 const PlannerEngine = (() => {
   const DAY_MS = 86400000;
   const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const PROTEINS = ["Chicken", "Beef", "Pork", "Seafood", "Meatless"];
-  const CUISINES = ["South Asian", "American", "Italian", "Mexican", "Chinese", "Other Cuisine"];
-  const QUICK = ["Quick", "Low Effort", "One-Pot"];
+  const PROTEINS = ["Chicken", "Beef", "Lamb / Goat", "Pork", "Seafood", "Eggs", "Vegetarian"];
+  const INDIAN = "Indian";
+  const CUISINES = [INDIAN, "American", "Italian", "Mexican", "Chinese", "Other Cuisine"];
+  const QUICK = ["Quick", "Low Effort"];
+  // Slots the family eats the same way almost every week; Auto-Populate repeats the usual instead of varying.
+  const ROUTINE_SLOTS = ["parents-breakfast", "parents-lunch"];
   const TAKEOUT = "Takeout / Restaurant Night";
   const KIDS_SLOTS = ["kids-breakfast", "namath-lunch", "kids-dinner"];
   const FILL_ORDER = ["kids-dinner", "parents-dinner", "namath-lunch", "parents-lunch", "kids-breakfast", "parents-breakfast"];
@@ -67,11 +70,13 @@ const PlannerEngine = (() => {
     return (cell.mealId && idx.byId.get(cell.mealId)) || idx.byName.get(normName(cell.text)) || null;
   }
 
-  function buildHistory(meals, plans, targetWeekStart, targetStartDay) {
+  function buildHistory(meals, plans, targetWeekStart, targetStartDay, routineSlots) {
     const idx = indexMeals(meals);
     const byMeal = new Map();
     const cellMeal = new Map();
     const slotTotals = {};
+    const slotIndian = {};
+    const routineCells = [];
     const varietyAgg = {};
     let earliestPast = Infinity;
     let cells = 0;
@@ -94,7 +99,13 @@ const PlannerEngine = (() => {
         agg.names.add(normName(text));
         weekCells++;
         const meal = matchMeal(idx, cell);
+        if (routineSlots.includes(slotKey)) {
+          routineCells.push({ slotKey, wd: weekdayOf(day), norm: normName(text), text, meal, weeksAgo: Math.abs(day - targetStartDay) / 7 });
+        }
         if (!meal) return;
+        const si = slotIndian[slotKey] || (slotIndian[slotKey] = { indian: 0, total: 0 });
+        si.total++;
+        if (hasTag(meal, INDIAN)) si.indian++;
         let rec = byMeal.get(meal.id);
         if (!rec) byMeal.set(meal.id, (rec = []));
         rec.push({ day, slotKey });
@@ -120,6 +131,8 @@ const PlannerEngine = (() => {
       byMeal,
       cellMeal,
       slotTotals,
+      slotIndian,
+      routineCells,
       variety,
       cells,
       weeks,
@@ -137,11 +150,16 @@ const PlannerEngine = (() => {
       takeoutNights: new Set(),
       newRecipeNights: new Set(),
       proteinDays: new Map(),
+      slotStats: new Map(),
     };
   }
 
   function addToCtx(ctx, dayIdx, slotKey, meal) {
     ctx.assign.set(dayIdx + "|" + slotKey, meal || null);
+    const ss = ctx.slotStats.get(slotKey) || { filled: 0, indian: 0 };
+    ss.filled++;
+    if (meal && hasTag(meal, INDIAN)) ss.indian++;
+    ctx.slotStats.set(slotKey, ss);
     if (!meal) return;
     const time = mealTime(slotKey);
     let byTime = ctx.mealDays.get(meal.id);
@@ -299,24 +317,35 @@ const PlannerEngine = (() => {
       });
     }
     [dayIdx - 1, dayIdx + 1].forEach((n) => {
-      // Breakfasts handle South Asian vs. not in their own alternation rule below.
-      if (sharesCuisine(meal, neighborOf(n), time === "breakfast" ? "South Asian" : null)) mix -= dinner ? 0.3 : 0.15;
+      // Breakfasts handle Indian vs. not in their own alternation rule below.
+      if (sharesCuisine(meal, neighborOf(n), time === "breakfast" ? INDIAN : null)) mix -= dinner ? 0.3 : 0.15;
     });
     parts.mix = Math.max(mix, -1.6);
 
-    // Breakfasts: alternate and space out Indian (South Asian) and non-Indian days.
+    // Breakfasts: alternate and space out Indian and non-Indian days, and keep the week's overall
+    // mix near the family's usual share, so "haven't had it in a while" can't tip it to one kind.
     // Only when both kinds are available, and softened for habit meals and weekly rituals.
     let alternate = 0;
+    let balance = 0;
     if (time === "breakfast" && S.hasBothKinds(slotKey)) {
-      const indian = hasTag(meal, "South Asian");
+      const indian = hasTag(meal, INDIAN);
       const protectedBy = Math.max(habit, clamp((parts.weekday + parts.rhythm) / 1.6, 0, 1));
       [dayIdx - 1, dayIdx + 1].forEach((n) => {
         const nb = neighborOf(n);
         if (!nb) return;
-        alternate += (hasTag(nb, "South Asian") === indian ? -1.0 : 0.4) * (1 - 0.85 * protectedBy);
+        alternate += (hasTag(nb, INDIAN) === indian ? -1.0 : 0.4) * (1 - 0.85 * protectedBy);
       });
+      if (!S.routineSlots.has(slotKey)) {
+        const ss = ctx.slotStats.get(slotKey) || { filled: 0, indian: 0 };
+        const range = S.indianRange(slotKey);
+        const after = ss.indian + (indian ? 1 : 0);
+        const left = 7 - ss.filled - 1;
+        if (after > range.hi) balance -= 2.5 * (after - range.hi);
+        if (after + left < range.lo) balance -= 2.5 * (range.lo - (after + left));
+      }
     }
     parts.alternate = alternate;
+    parts.balance = balance;
 
     // Repeats within the week - tolerated in slots where this family repeats a lot.
     let repeat = 0;
@@ -386,7 +415,8 @@ const PlannerEngine = (() => {
     const eligible = {};
     slotKeys.forEach((k) => (eligible[k] = meals.filter((m) => isEligible(m, k))));
 
-    const H = buildHistory(meals, plans, plan.weekStart, weekStartDay);
+    const routineSlotList = (opts.routineSlots || ROUTINE_SLOTS).filter((k) => slotKeys.includes(k));
+    const H = buildHistory(meals, plans, plan.weekStart, weekStartDay, routineSlotList);
     const idx = indexMeals(meals);
 
     const statsCache = new Map();
@@ -440,12 +470,22 @@ const PlannerEngine = (() => {
       return (popRaw(meal, slotKey) / max) * Math.min(1, max * 5) * Math.min(1, (H.slotTotals[slotKey] || 0) / 12);
     };
 
+    // The week's acceptable number of Indian breakfasts, from the family's own usual share.
+    const indianRange = (slotKey) => {
+      const si = H.slotIndian[slotKey];
+      const share = si && si.total >= 8 ? clamp(si.indian / si.total, 0.25, 0.6) : 0.4;
+      const target = clamp(Math.round(share * 7), 2, 4);
+      return { lo: Math.max(1, target - 1), hi: target + 1 };
+    };
+
     const S = {
       weekStartDay,
+      routineSlots: new Set(routineSlotList),
+      indianRange,
       cellMeal: H.cellMeal,
       hasBothKinds: (slotKey) => {
         const list = eligible[slotKey] || [];
-        return list.some((m) => hasTag(m, "South Asian")) && list.some((m) => !hasTag(m, "South Asian"));
+        return list.some((m) => hasTag(m, INDIAN)) && list.some((m) => !hasTag(m, INDIAN));
       },
       avoid: opts.avoid || {},
       stats,
@@ -457,7 +497,7 @@ const PlannerEngine = (() => {
 
     // Cells already filled stay as they are, and count toward this week's balance.
     const baseFilled = [];
-    const toFill = [];
+    let toFill = [];
     for (let d = 0; d < 7; d++) {
       slotKeys.forEach((slotKey) => {
         const cell = plan.cells && plan.cells[dayToISO(weekStartDay + d) + "_" + slotKey];
@@ -465,6 +505,45 @@ const PlannerEngine = (() => {
         else toFill.push({ d, slotKey });
       });
     }
+
+    // Routine slots repeat the family's usual for each weekday (a saved routine first, else what they
+    // ate on that weekday in most recent weeks) instead of being varied.
+    const explicit = opts.routine || {};
+    const routineOk = opts.routineOk || (() => true);
+    const learn = (slotKey, wd) => {
+      const rows = H.routineCells.filter((c) => c.slotKey === slotKey && c.wd === wd && c.weeksAgo <= 12);
+      if (rows.length < 2) return null;
+      const agg = new Map();
+      let total = 0;
+      rows.forEach((r) => {
+        const w = 1 / (1 + 0.25 * r.weeksAgo);
+        total += w;
+        const a = agg.get(r.norm) || { w: 0, n: 0, r };
+        a.w += w;
+        a.n++;
+        agg.set(r.norm, a);
+      });
+      const top = [...agg.values()].sort((a, b) => b.w - a.w)[0];
+      return top.n >= 2 && top.w / total >= 0.6 ? top.r : null;
+    };
+    const routineAssignments = [];
+    const stillToFill = [];
+    toFill.forEach((t) => {
+      if (!S.routineSlots.has(t.slotKey)) return stillToFill.push(t);
+      const saved = explicit[t.slotKey] && explicit[t.slotKey][t.d];
+      let entry = null;
+      if (saved && (saved.mealId || saved.text)) {
+        const meal = (saved.mealId && idx.byId.get(saved.mealId)) || idx.byName.get(normName(saved.text)) || null;
+        entry = { meal, text: meal ? meal.name : String(saved.text || "").trim() };
+      } else {
+        const l = learn(t.slotKey, t.d);
+        if (l) entry = { meal: l.meal, text: l.meal ? l.meal.name : l.text };
+      }
+      if (!entry || !entry.text || (entry.meal && !routineOk(entry.meal))) return stillToFill.push(t);
+      routineAssignments.push({ d: t.d, slotKey: t.slotKey, meal: entry.meal, text: entry.text });
+      baseFilled.push({ d: t.d, slotKey: t.slotKey, meal: entry.meal });
+    });
+    toFill = stillToFill;
 
     function runOnce(jitter, shuffle) {
       const ctx = makeCtx();
@@ -510,22 +589,31 @@ const PlannerEngine = (() => {
     const tied = runs.filter((r) => r.total >= top - 0.05);
     const best = tied[Math.floor(rng() * tied.length)];
 
-    const assignments = best.picks
-      .map((p) => ({
-        key: dayToISO(weekStartDay + p.d) + "_" + p.slotKey,
-        dayIdx: p.d,
-        slotKey: p.slotKey,
-        mealId: p.meal.id,
-        text: p.meal.name,
-        reasons: explain(p.meal, p.scored),
-        score: p.scored.total,
-      }))
-      .sort((a, b) => a.dayIdx - b.dayIdx);
+    const scoredOut = best.picks.map((p) => ({
+      key: dayToISO(weekStartDay + p.d) + "_" + p.slotKey,
+      dayIdx: p.d,
+      slotKey: p.slotKey,
+      mealId: p.meal.id,
+      text: p.meal.name,
+      reasons: explain(p.meal, p.scored),
+      score: p.scored.total,
+    }));
+    const routineOut = routineAssignments.map((r) => ({
+      key: dayToISO(weekStartDay + r.d) + "_" + r.slotKey,
+      dayIdx: r.d,
+      slotKey: r.slotKey,
+      mealId: r.meal ? r.meal.id : null,
+      text: r.text,
+      reasons: [`Your usual ${DOW[r.d]} ${mealTime(r.slotKey)}`],
+      score: 0,
+      routine: true,
+    }));
+    const assignments = [...routineOut, ...scoredOut].sort((a, b) => a.dayIdx - b.dayIdx);
 
     return {
       assignments,
       skipped: best.skipped.map((s) => dayToISO(weekStartDay + s.d) + "_" + s.slotKey),
-      stats: { filled: assignments.length, historyCells: H.cells, historyWeeks: H.weeks },
+      stats: { filled: assignments.length, routine: routineOut.length, historyCells: H.cells, historyWeeks: H.weeks },
     };
   }
 
