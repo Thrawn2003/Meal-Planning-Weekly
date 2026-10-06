@@ -5,21 +5,28 @@ const TagTools = (() => {
   const GROUPS = [
     { name: "Cuisine", tags: ["Indian", "American", "Italian", "Mexican", "Chinese", "Other Cuisine"] },
     { name: "Main protein", tags: ["Chicken", "Beef", "Lamb / Goat", "Pork", "Seafood", "Eggs", "Vegetarian"] },
-    { name: "Effort", tags: ["Quick", "Low Effort", "High Effort"] },
-    { name: "Diet", tags: ["Carby", "Healthy", "Gluten-Free", "Dairy-Free"] },
-    { name: "Occasion & family", tags: ["Kid-Favorite", "Spicy", "Takeout / Restaurant Night", "Weekend / Special", "New Recipe"] },
+    { name: "Effort & prep", tags: ["Quick", "Low Effort", "High Effort", "One-Pot", "Make-Ahead", "Needs Planning Ahead"] },
+    { name: "Diet", tags: ["Carby", "Low-Carb", "Healthy", "Gluten-Free", "Dairy-Free"] },
+    { name: "Family", tags: ["Kid-Favorite", "Spicy", "Packable (school lunch)"] },
+    { name: "Practical", tags: ["Good for Leftovers", "Freezer-Friendly", "Budget-Friendly"] },
+    { name: "Occasion", tags: ["Takeout / Restaurant Night", "Weekend / Special", "New Recipe"] },
   ];
   const ALL = GROUPS.flatMap((g) => g.tags);
 
-  // Older tags that were vague, overlapping, or never used by the planner.
+  // Older tag names, converted automatically.
   const RENAMES = {
     "South Asian": "Indian",
     Meatless: "Vegetarian",
     Vegan: "Vegetarian",
-    "One-Pot": "Low Effort",
+    "Meal-Prep Friendly": "Make-Ahead",
+    "Leftover-Friendly": "Good for Leftovers",
     "Picky-Eater-Safe": "Kid-Favorite",
   };
-  const DROPPED = ["Meal-Prep Friendly", "Low-Carb", "Leftover-Friendly", "Freezer-Friendly", "Budget-Friendly", "Seasonal"];
+  const DROPPED = ["Seasonal"];
+
+  // Tags that can be checked against the meal itself. Everything else (effort, diet, kid, practical,
+  // special) can't be known from a name, so it's cleared and then asked about - never assumed.
+  const KEPT_WHEN_RESETTING = new Set([...GROUPS[0].tags, ...GROUPS[1].tags, "Takeout / Restaurant Night", "New Recipe"]);
 
   const CUISINE_RULES = [
     ["Indian", /\b(indian|daal|dal|dhal|salan|gosht|ghost|paratha|roti|chapati|naan|samosas?|upma|anda|bhendi|bhindi|tarkari|khatti|chutney|biryani|pulao|curry|masala|tikka|korma|karahi|chana|paneer|keema|nihari|haleem|talawa|talwa|aloo|chaat|idli|dosa|poha|handi|vindaloo|saag|bhaji|pakora|halwa|kheer)\b/i],
@@ -39,6 +46,12 @@ const TagTools = (() => {
   const VEG_RULE = /\b(daal|dal|dhal|paneer|tofu|veggies?|vegetables?|vegetarian|bhendi|bhindi|okra|tarkari|chana|aloo|khatti|upma|idli|dosa|poha)\b/i;
   const TAKEOUT_RULE = /\(out\)|\btake[- ]?out\b|\brestaurant\b|\bgo out\b|\beating out\b|\bwendy'?s\b|\bmcdonald'?s\b|\bchipotle\b|\bwhole foods\b|\bdate night\b|\bdiner\b|\bdelivery\b/i;
 
+  // Only things a name settles outright. Anything debatable (healthy? kid-favorite? how hard?) is asked, not guessed.
+  const CARBY_RULE = /\b(pasta|spaghetti|pizza|bagels?|parathas?|rotis?|naan|pancakes?|waffles?|french toast|noodles?|mac (and|&|n) cheese|biryani|pulao|fried rice|lasagn[ae])\b/i;
+  const NO_COOK_RULE = /\b(cereal|bagels?|sandwich(es)?|boiled eggs?|yogurt|hot ?dogs?|school lunch)\b|\b(?<!french )toast\b/i;
+  const SPECIAL_RULE = /\bdate night\b/i;
+
+  // Cuisine, main protein and takeout: things you can check against the meal itself.
   function suggestTags(name) {
     const n = String(name == null ? "" : name);
     const out = [];
@@ -49,6 +62,20 @@ const TagTools = (() => {
     if (eggs) out.push("Eggs");
     if (!out.some((t) => MEAT_RULES.some(([m]) => m === t)) && !eggs && VEG_RULE.test(n)) out.push("Vegetarian");
     if (TAKEOUT_RULE.test(n)) out.push("Takeout / Restaurant Night");
+    return out;
+  }
+
+  // suggestTags plus the few effort/diet/occasion tags a name makes beyond doubt.
+  function obviousTags(name) {
+    const n = String(name == null ? "" : name);
+    const out = suggestTags(n);
+    const add = (t) => !out.includes(t) && out.push(t);
+    if (CARBY_RULE.test(n)) add("Carby");
+    if (NO_COOK_RULE.test(n) || TAKEOUT_RULE.test(n)) {
+      add("Quick");
+      add("Low Effort");
+    }
+    if (SPECIAL_RULE.test(n)) add("Weekend / Special");
     return out;
   }
 
@@ -64,27 +91,24 @@ const TagTools = (() => {
 
   const inGroup = (name, tags) => tags.some((t) => GROUPS.find((g) => g.name === name).tags.includes(t));
 
-  // Current tags plus a missing cuisine / protein / takeout tag inferred from the name.
-  // Never overrides a cuisine or protein tag that is already there.
-  function fillGaps(name, existing) {
-    const tags = mapTags(existing);
-    suggestTags(name).forEach((t) => {
-      const isCuisine = GROUPS[0].tags.includes(t);
-      const isProtein = GROUPS[1].tags.includes(t);
-      if (isCuisine && inGroup("Cuisine", tags)) return;
-      if (isProtein && inGroup("Main protein", tags)) return;
+  // Adds the given tags to a list without ever overriding an existing cuisine or protein tag.
+  function addWithoutOverriding(tags, additions) {
+    additions.forEach((t) => {
+      if (GROUPS[0].tags.includes(t) && inGroup("Cuisine", tags)) return;
+      if (GROUPS[1].tags.includes(t) && inGroup("Main protein", tags)) return;
       if (!tags.includes(t)) tags.push(t);
     });
     return tags;
   }
 
-  // A copy of the meal as the planner should see it, so a meal without cuisine/protein tags still counts.
-  const withInferredTags = (meal) => ({ ...meal, tags: fillGaps(meal.name, meal.tags) });
+  // The planner's view of a meal: a missing cuisine / protein / takeout tag is inferred from the name.
+  // Never saved onto the meal, and never overrides a tag that is there.
+  const withInferredTags = (meal) => ({ ...meal, tags: addWithoutOverriding(mapTags(meal.tags), suggestTags(meal.name)) });
 
-  // Renames/drops old tags, then fills in whatever the meal's name makes obvious.
+  // Renames old tags and drops retired ones (used by the first tag migration).
   function migrateLibrary({ meals, customTags, excludedTags }) {
     (meals || []).forEach((m) => {
-      m.tags = fillGaps(m.name, m.tags);
+      m.tags = addWithoutOverriding(mapTags(m.tags), suggestTags(m.name));
     });
     const retired = new Set([...Object.keys(RENAMES), ...DROPPED, ...ALL]);
     return {
@@ -93,7 +117,21 @@ const TagTools = (() => {
     };
   }
 
-  return { GROUPS, ALL, RENAMES, DROPPED, suggestTags, mapTags, withInferredTags, migrateLibrary };
+  // Clears every tag that can't be checked against the meal, applies the obvious ones, and marks the meal
+  // as needing a quick review. Returns the old tags so nothing is lost for good.
+  function resetGuessedTags(meals) {
+    const backup = {};
+    (meals || []).forEach((m) => {
+      const old = Array.isArray(m.tags) ? m.tags.slice() : [];
+      backup[m.id] = old;
+      const kept = mapTags(old).filter((t) => KEPT_WHEN_RESETTING.has(t) || !ALL.includes(t));
+      m.tags = addWithoutOverriding(kept, obviousTags(m.name));
+      m.tagsReviewed = false;
+    });
+    return backup;
+  }
+
+  return { GROUPS, ALL, RENAMES, DROPPED, KEPT_WHEN_RESETTING, suggestTags, obviousTags, mapTags, withInferredTags, migrateLibrary, resetGuessedTags };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = TagTools;

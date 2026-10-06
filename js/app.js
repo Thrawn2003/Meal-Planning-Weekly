@@ -27,6 +27,8 @@ const STORAGE_KEYS = {
   currentWeekKey: "mpw_current_week_key",
   phantomCleanup: "mpw_phantom_cleanup_v2",
   tagsV2: "mpw_tags_v2",
+  tagsV3: "mpw_tags_v3",
+  tagsBackupV3: "mpw_tags_backup_v3",
   routine: "mpw_routine",
 };
 
@@ -93,6 +95,16 @@ function migrateTagsV2() {
   persistMeals();
   persistCustomTags();
   persistFilters();
+}
+
+// Most effort/diet/kid/special tags were guesses that can't be known from a name. Clears them from every
+// meal (keeping a backup), applies only the obvious ones, and queues each meal for a quick tag review.
+function migrateTagsV3(originalTags) {
+  if (loadJSON(STORAGE_KEYS.tagsV3, false)) return;
+  saveJSON(STORAGE_KEYS.tagsV3, true);
+  const backup = TagTools.resetGuessedTags(state.meals);
+  saveJSON(STORAGE_KEYS.tagsBackupV3, { ...backup, ...(originalTags || {}) });
+  persistMeals();
 }
 
 /* ---------------------- Storage helpers ---------------------- */
@@ -973,6 +985,8 @@ function renderAddMealView() {
   renderSlotCheckboxes();
   renderTagCheckboxes();
   renderMealLibrary();
+  closeTagReview();
+  tagReviewDoneEl.classList.add("hidden");
 }
 
 function startEditingMeal(meal) {
@@ -1076,7 +1090,7 @@ const tagSuggestEl = document.getElementById("tag-suggest");
 
 function renderTagSuggestions() {
   const ticked = new Set(Array.from(mealTagsCheckboxesEl.querySelectorAll("input:checked")).map((cb) => cb.value));
-  const ideas = TagTools.suggestTags(mealNameInput.value).filter((t) => !ticked.has(t));
+  const ideas = TagTools.obviousTags(mealNameInput.value).filter((t) => !ticked.has(t));
   tagSuggestEl.innerHTML = "";
   tagSuggestEl.classList.toggle("hidden", ideas.length === 0);
   if (!ideas.length) return;
@@ -1100,6 +1114,106 @@ function renderTagSuggestions() {
 
 mealNameInput.addEventListener("input", renderTagSuggestions);
 mealTagsCheckboxesEl.addEventListener("change", renderTagSuggestions);
+
+/* ---------------------- Guided tag review ---------------------- */
+
+const tagReviewBannerEl = document.getElementById("tag-review-banner");
+const tagReviewCountEl = document.getElementById("tag-review-count");
+const tagReviewEl = document.getElementById("tag-review");
+const tagReviewDoneEl = document.getElementById("tag-review-done");
+const tagReviewNameEl = document.getElementById("tag-review-name");
+const tagReviewProgressEl = document.getElementById("tag-review-progress");
+const tagReviewAutoEl = document.getElementById("tag-review-auto");
+const tagReviewTagsEl = document.getElementById("tag-review-tags");
+const reviewSkipped = new Set();
+let reviewingId = null;
+
+const pendingReviewCount = () => state.meals.filter((m) => m.tagsReviewed === false).length;
+
+function renderTagReviewBanner() {
+  const n = pendingReviewCount();
+  tagReviewBannerEl.classList.toggle("hidden", n === 0 || !tagReviewEl.classList.contains("hidden"));
+  tagReviewCountEl.textContent = `🏷️ ${n} meal${n === 1 ? " needs" : "s need"} their tags checked`;
+}
+
+function closeTagReview() {
+  tagReviewEl.classList.add("hidden");
+  reviewingId = null;
+  renderTagReviewBanner();
+}
+
+function showReviewMeal() {
+  const meal = state.meals.find((m) => m.tagsReviewed === false && !reviewSkipped.has(m.id));
+  if (!meal) {
+    const allDone = pendingReviewCount() === 0;
+    closeTagReview();
+    renderMealLibrary();
+    tagReviewDoneEl.classList.toggle("hidden", !allDone);
+    return;
+  }
+  reviewingId = meal.id;
+  tagReviewNameEl.textContent = meal.name;
+  tagReviewProgressEl.textContent = `${pendingReviewCount()} left to check`;
+
+  const fromName = TagTools.obviousTags(meal.name).filter((t) => (meal.tags || []).includes(t));
+  tagReviewAutoEl.textContent = fromName.length ? "Already filled in from the name: " + fromName.join(", ") + ". Untick any that are wrong." : "";
+  tagReviewAutoEl.classList.toggle("hidden", !fromName.length);
+
+  tagReviewTagsEl.innerHTML = "";
+  tagGroups().forEach((group) => {
+    const wrap = document.createElement("div");
+    wrap.className = "tag-group";
+    const title = document.createElement("div");
+    title.className = "tag-group-title";
+    title.textContent = group.name;
+    const row = document.createElement("div");
+    row.className = "checkbox-grid";
+    group.tags.forEach((tag) => {
+      const label = document.createElement("label");
+      label.className = "checkbox-chip";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = tag;
+      cb.checked = (meal.tags || []).includes(tag);
+      label.appendChild(cb);
+      const span = document.createElement("span");
+      span.textContent = tag;
+      label.appendChild(span);
+      row.appendChild(label);
+    });
+    wrap.appendChild(title);
+    wrap.appendChild(row);
+    tagReviewTagsEl.appendChild(wrap);
+  });
+  tagReviewEl.classList.remove("hidden");
+  renderTagReviewBanner();
+}
+
+document.getElementById("tag-review-start").addEventListener("click", () => {
+  reviewSkipped.clear();
+  tagReviewDoneEl.classList.add("hidden");
+  showReviewMeal();
+  tagReviewEl.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+document.getElementById("tag-review-save").addEventListener("click", () => {
+  const meal = state.meals.find((m) => m.id === reviewingId);
+  if (!meal) return;
+  meal.tags = Array.from(tagReviewTagsEl.querySelectorAll("input:checked")).map((cb) => cb.value);
+  meal.tagsReviewed = true;
+  persistMeals();
+  showReviewMeal();
+});
+
+document.getElementById("tag-review-skip").addEventListener("click", () => {
+  if (reviewingId) reviewSkipped.add(reviewingId);
+  showReviewMeal();
+});
+
+document.getElementById("tag-review-stop").addEventListener("click", () => {
+  closeTagReview();
+  renderMealLibrary();
+});
 
 function removeCustomTag(tag) {
   if (!confirm(`Remove the custom tag "${tag}"? It will be removed from any meals that have it.`)) return;
@@ -1149,6 +1263,7 @@ mealFormEl.addEventListener("submit", (e) => {
       meal.name = name;
       meal.slots = slots;
       meal.tags = tags;
+      meal.tagsReviewed = true; // you just set these yourself
       persistMeals();
     }
     stopEditingMeal();
@@ -1158,6 +1273,7 @@ mealFormEl.addEventListener("submit", (e) => {
       name,
       slots,
       tags,
+      tagsReviewed: true,
       lastUsed: null,
       usageHistory: [],
     });
@@ -1166,6 +1282,7 @@ mealFormEl.addEventListener("submit", (e) => {
   }
 
   renderMealLibrary();
+  renderTagReviewBanner();
 });
 
 function renderMealLibrary() {
@@ -1191,6 +1308,7 @@ function renderMealLibrary() {
       if (slotLabels.length) metaBits.push(slotLabels.map((s) => `<span class="tag">${escapeHTML(s)}</span>`).join(""));
       else metaBits.push(`<span class="tag">Any slot</span>`);
       if (meal.tags && meal.tags.length) metaBits.push(meal.tags.map((t) => `<span class="tag">${escapeHTML(t)}</span>`).join(""));
+      if (meal.tagsReviewed === false) metaBits.push(`<span class="tag tag-unchecked">🏷️ tags not checked yet</span>`);
 
       const usedInfo = meal.lastUsed
         ? `Last used week of ${formatPretty(fromISODate(meal.lastUsed))} · used ${meal.usageHistory?.length || 0}x`
@@ -1239,5 +1357,7 @@ document.getElementById("clear-meals-btn").addEventListener("click", () => {
    ===================================================================== */
 
 removePhantomMeals();
+const tagsBeforeMigrations = Object.fromEntries(state.meals.map((m) => [m.id, (m.tags || []).slice()]));
 migrateTagsV2();
+migrateTagsV3(tagsBeforeMigrations);
 showView("plan");

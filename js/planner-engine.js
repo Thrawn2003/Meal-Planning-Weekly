@@ -7,7 +7,7 @@ const PlannerEngine = (() => {
   const PROTEINS = ["Chicken", "Beef", "Lamb / Goat", "Pork", "Seafood", "Eggs", "Vegetarian"];
   const INDIAN = "Indian";
   const CUISINES = [INDIAN, "American", "Italian", "Mexican", "Chinese", "Other Cuisine"];
-  const QUICK = ["Quick", "Low Effort"];
+  const QUICK = ["Quick", "Low Effort", "One-Pot", "Make-Ahead"];
   // Slots the family eats the same way almost every week; Auto-Populate repeats the usual instead of varying.
   const ROUTINE_SLOTS = ["parents-breakfast", "parents-lunch"];
   const TAKEOUT = "Takeout / Restaurant Night";

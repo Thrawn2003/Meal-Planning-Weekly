@@ -7,7 +7,7 @@ const TagTools = require("../js/tag-tools.js");
 test("the tag set is grouped, unique, and free of retired tags", () => {
   assert.equal(new Set(TagTools.ALL).size, TagTools.ALL.length);
   TagTools.DROPPED.concat(Object.keys(TagTools.RENAMES)).forEach((old) => assert.ok(!TagTools.ALL.includes(old), old));
-  assert.deepEqual(TagTools.GROUPS.map((g) => g.name), ["Cuisine", "Main protein", "Effort", "Diet", "Occasion & family"]);
+  assert.deepEqual(TagTools.GROUPS.map((g) => g.name), ["Cuisine", "Main protein", "Effort & prep", "Diet", "Family", "Practical", "Occasion"]);
 });
 
 test("suggests accurate cuisine and protein tags from names", () => {
@@ -36,20 +36,20 @@ test("migrates old tags, keeps user tags, and fills only gaps", () => {
   const meals = [
     { name: "Upma", tags: ["South Asian", "Healthy", "Meal-Prep Friendly"] },
     { name: "Pizza", tags: ["Carby", "Seasonal"] },
-    { name: "Burgers", tags: ["Chicken", "Picky-Eater-Safe"] },
+    { name: "Burgers", tags: ["Chicken", "Picky-Eater-Safe", "Leftover-Friendly"] },
     { name: "Mystery Dish", tags: ["Meatless", "Vegan", "One-Pot"] },
   ];
   const out = TagTools.migrateLibrary({
     meals,
-    customTags: ["Zesty", "Seasonal", "Indian", "South Asian"],
+    customTags: ["Zesty", "Seasonal", "Indian", "South Asian", "Make-Ahead"],
     excludedTags: ["South Asian", "Low-Carb", "Quick"],
   });
-  assert.deepEqual(meals[0].tags, ["Indian", "Healthy", "Vegetarian"]);
+  assert.deepEqual(meals[0].tags, ["Indian", "Healthy", "Make-Ahead", "Vegetarian"]);
   assert.deepEqual(meals[1].tags, ["Carby", "Italian"]);
-  assert.deepEqual(meals[2].tags, ["Chicken", "Kid-Favorite", "American"], "an existing protein tag is not overridden");
-  assert.deepEqual(meals[3].tags, ["Vegetarian", "Low Effort"]);
+  assert.deepEqual(meals[2].tags, ["Chicken", "Kid-Favorite", "Good for Leftovers", "American"], "an existing protein tag is not overridden");
+  assert.deepEqual(meals[3].tags, ["Vegetarian", "One-Pot"]);
   assert.deepEqual(out.customTags, ["Zesty"]);
-  assert.deepEqual(out.excludedTags, ["Indian", "Quick"]);
+  assert.deepEqual(out.excludedTags, ["Indian", "Low-Carb", "Quick"]);
 });
 
 test("the planner's view of a meal fills missing tags without touching the stored meal", () => {
@@ -85,4 +85,39 @@ test("breakfast balance works even when Indian breakfasts have no Indian tag", (
 test("migration is safe on empty and messy input", () => {
   assert.doesNotThrow(() => TagTools.migrateLibrary({}));
   assert.doesNotThrow(() => TagTools.migrateLibrary({ meals: [{ name: null }, { name: "X", tags: null }] }));
+});
+
+test("only tags a name settles outright are applied without asking", () => {
+  const o = (n) => TagTools.obviousTags(n);
+  assert.deepEqual(o("Pasta & Meatballs"), ["Italian", "Beef", "Carby"]);
+  assert.deepEqual(o("Cereal & Milk"), ["American", "Quick", "Low Effort"]);
+  assert.deepEqual(o("Boiled Eggs"), ["Eggs", "Quick", "Low Effort"]);
+  assert.deepEqual(o("Avocado Toast"), ["American", "Quick", "Low Effort"]);
+  assert.deepEqual(o("Date Night (Out)"), ["Takeout / Restaurant Night", "Quick", "Low Effort", "Weekend / Special"]);
+  assert.ok(!o("French Toast").includes("Quick"), "French toast is cooked");
+  ["Chicken Ka Salan", "Burgers", "Salad", "Upma", "Gosht", "Garlic Lemon Shrimp"].forEach((n) => {
+    ["Quick", "Low Effort", "High Effort", "Healthy", "Kid-Favorite", "Spicy"].forEach((t) => assert.ok(!o(n).includes(t), n + " should not be assumed " + t));
+  });
+});
+
+test("resetting clears every guessed tag, keeps checkable ones, applies obvious ones, and remembers the old tags", () => {
+  const meals = [
+    { id: "a", name: "Pizza", tags: ["Italian", "Carby", "Kid-Favorite", "Quick", "High Effort", "Healthy", "Zesty"] },
+    { id: "b", name: "Gosht", tags: ["Indian", "High Effort", "Spicy", "Weekend / Special", "New Recipe"] },
+    { id: "c", name: "Upma", tags: [] },
+    { id: "d", name: "Chinese Takeout", tags: ["Chinese", "Takeout / Restaurant Night", "Gluten-Free", "Dairy-Free"] },
+  ];
+  const backup = TagTools.resetGuessedTags(meals);
+  assert.deepEqual(meals[0].tags, ["Italian", "Zesty", "Carby"], "own tag kept, guessed ones gone, obvious one applied");
+  assert.deepEqual(meals[1].tags, ["Indian", "New Recipe", "Lamb / Goat"]);
+  assert.deepEqual(meals[2].tags, ["Indian", "Vegetarian"]);
+  assert.deepEqual(meals[3].tags, ["Chinese", "Takeout / Restaurant Night", "Quick", "Low Effort"]);
+  meals.forEach((m) => assert.equal(m.tagsReviewed, false));
+  assert.deepEqual(backup.a, ["Italian", "Carby", "Kid-Favorite", "Quick", "High Effort", "Healthy", "Zesty"]);
+  assert.deepEqual(backup.d, ["Chinese", "Takeout / Restaurant Night", "Gluten-Free", "Dairy-Free"]);
+});
+
+test("resetting is safe on empty and messy input", () => {
+  assert.deepEqual(TagTools.resetGuessedTags([]), {});
+  assert.doesNotThrow(() => TagTools.resetGuessedTags([{ id: "x", name: null, tags: null }, { id: "y" }]));
 });

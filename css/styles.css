@@ -324,6 +324,78 @@ main#app {
   margin-top: 0;
 }
 
+.tag-review-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  background: var(--green-light);
+  border-color: var(--green);
+}
+
+.tag-review-sub {
+  font-size: 0.92rem;
+  color: var(--green-dark);
+  max-width: 62ch;
+}
+
+.tag-review {
+  margin-bottom: 1.25rem;
+  border-color: var(--green);
+  border-width: 2px;
+}
+
+.tag-review-progress {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--green-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tag-review-name {
+  margin: 0.2rem 0 0.6rem;
+  color: var(--brown-dark);
+}
+
+.tag-review-auto {
+  background: var(--beige-light);
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.92rem;
+  color: var(--green-dark);
+}
+
+.tag-review-help {
+  color: var(--brown);
+  margin: 0.4rem 0 0.9rem;
+}
+
+.tag-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}
+
+.tag-review-done {
+  background: var(--green-light);
+  border: 1px solid var(--green);
+  border-radius: 14px;
+  padding: 0.8rem 1.1rem;
+  margin-bottom: 1.25rem;
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
+.meal-card-meta .tag.tag-unchecked {
+  background: transparent;
+  border: 1px dashed var(--brown);
+  color: var(--brown);
+}
+
 .tag-suggest {
   display: flex;
   flex-wrap: wrap;

@@ -116,6 +116,29 @@
       <p class="hint">Build your meal library here. Every meal you add can be picked in the weekly planner and used by Auto-Populate.</p>
     </div>
 
+    <div id="tag-review-banner" class="card tag-review-banner hidden">
+      <div>
+        <strong id="tag-review-count"></strong>
+        <div class="tag-review-sub">Effort, diet, kid-favorite and similar tags were guesses, so they were cleared. A quick pass sets each one to what's actually true. Anything a name settles outright is already filled in.</div>
+      </div>
+      <button type="button" id="tag-review-start" class="btn btn-primary">Start tag review</button>
+    </div>
+
+    <div id="tag-review-done" class="tag-review-done hidden" role="status">🎉 Every meal's tags are checked. You can still change any of them with Edit.</div>
+
+    <div id="tag-review" class="card tag-review hidden">
+      <div id="tag-review-progress" class="tag-review-progress"></div>
+      <h2 id="tag-review-name" class="tag-review-name"></h2>
+      <p id="tag-review-auto" class="tag-review-auto hidden"></p>
+      <p class="tag-review-help">Tick everything that's true for this meal. Leave a tag unticked if you're not sure.</p>
+      <div id="tag-review-tags"></div>
+      <div class="tag-review-actions">
+        <button type="button" id="tag-review-save" class="btn btn-primary">Save &amp; next</button>
+        <button type="button" id="tag-review-skip" class="btn btn-secondary">Skip for now</button>
+        <button type="button" id="tag-review-stop" class="btn btn-secondary">Stop reviewing</button>
+      </div>
+    </div>
+
     <form id="add-meal-form" class="card meal-form">
       <h2 id="meal-form-heading" class="meal-form-heading hidden">Editing "<span id="meal-form-heading-name"></span>"</h2>
       <div class="form-row">

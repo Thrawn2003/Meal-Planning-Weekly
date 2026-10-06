@@ -53,17 +53,25 @@ Click **🖨️ Save & Print PDF** on a filled-in week. This adds the week to **
 
 ## Categories (tags)
 
-The tags are grouped, and every one of them is something the planner or the filters actually use:
+Tags are grouped. Cuisine and main protein can be checked against the meal itself; the rest are your call.
 
 - **Cuisine**: Indian, American, Italian, Mexican, Chinese, Other Cuisine
 - **Main protein**: Chicken, Beef, Lamb / Goat, Pork, Seafood, Eggs, Vegetarian
-- **Effort**: Quick, Low Effort, High Effort
-- **Diet**: Carby, Healthy, Gluten-Free, Dairy-Free
-- **Occasion & family**: Kid-Favorite, Spicy, Takeout / Restaurant Night, Weekend / Special, New Recipe
+- **Effort & prep**: Quick, Low Effort, High Effort, One-Pot, Make-Ahead, Needs Planning Ahead
+- **Diet**: Carby, Low-Carb, Healthy, Gluten-Free, Dairy-Free
+- **Family**: Kid-Favorite, Spicy, Packable (school lunch)
+- **Practical**: Good for Leftovers, Freezer-Friendly, Budget-Friendly
+- **Occasion**: Takeout / Restaurant Night, Weekend / Special, New Recipe
 
-When you type a meal's name, the Add New Meal page suggests the cuisine, protein and takeout tags it makes obvious (one click to apply). Add your own tags from the "+ Add Tag" box; tags you added (not the built-in ones) can be removed with the "×" next to them, which also strips them from any meals that had them.
+**Nothing is assumed.** A meal only gets a tag if its name settles it outright (Pasta → Italian + Carby, Cereal → Quick + Low Effort, Date Night → Weekend / Special) or you ticked it yourself. Whether a meal is healthy, a kid-favorite, how hard it is, or whether it's gluten-free can't be known from a name, so those are asked about, never guessed.
 
-Older versions had vaguer tags. They're converted automatically the first time you open the app: South Asian → Indian, Meatless/Vegan → Vegetarian, One-Pot → Low Effort, Picky-Eater-Safe → Kid-Favorite; Meal-Prep Friendly, Low-Carb, Leftover-Friendly, Freezer-Friendly, Budget-Friendly and Seasonal are retired. A meal missing a cuisine or protein tag gets the one its name makes obvious (existing tags are never overridden). Any leftover placeholder or demo meals from earlier versions are also removed, along with boxes that had been filled from them.
+**Tag review.** The first time you open this version, every effort, diet, family, practical and occasion tag from older versions is cleared (a backup of your old tags is kept in the browser as `mpw_tags_backup_v3`), the obvious ones are applied, and Add New Meal shows a **Start tag review** banner. It walks through your meals one at a time with the obvious tags pre-ticked: tick what's true, then Save & next (or Skip). Meals you add or edit yourself count as reviewed.
+
+When you type a meal's name on Add New Meal, it suggests the obvious tags as one-click chips. Add your own tags from the "+ Add Tag" box; tags you added (not the built-in ones) can be removed with the "×" next to them, which also strips them from any meals that had them.
+
+Older tag names are converted automatically: South Asian → Indian, Meatless/Vegan → Vegetarian, Meal-Prep Friendly → Make-Ahead, Leftover-Friendly → Good for Leftovers, Picky-Eater-Safe → Kid-Favorite (Seasonal is retired). Any leftover placeholder or demo meals from earlier versions are also removed, along with boxes that had been filled from them.
+
+The planner itself still recognizes cuisine and protein from a meal's name when a meal has no tag for them, only while planning; it's never saved onto your meals, and a tag you set always wins.
 
 ## Meals
 
