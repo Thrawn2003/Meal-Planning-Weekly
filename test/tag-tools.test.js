@@ -16,10 +16,13 @@ test("suggests accurate cuisine and protein tags from names", () => {
   assert.deepEqual(s("Avocado Toast"), ["American"]);
   assert.deepEqual(s("Chicken Ka Salan"), ["Indian", "Chicken"]);
   assert.deepEqual(s("Mash Ki Daal"), ["Indian", "Vegetarian"]);
-  assert.deepEqual(s("Pasta & Meatballs"), ["Italian", "Beef"]);
+  assert.deepEqual(s("Pasta & Meatballs"), ["Italian"], "meatballs can be beef, pork, veal or turkey");
   assert.deepEqual(s("Chicken Tacos"), ["Mexican", "Chicken"]);
   assert.deepEqual(s("Chinese Takeout"), ["Chinese", "Takeout / Restaurant Night"]);
-  assert.deepEqual(s("Gosht"), ["Indian", "Lamb / Goat"]);
+  assert.deepEqual(s("Gosht"), ["Indian"], "gosht just means meat");
+  assert.deepEqual(s("Lamb Rogan Josh"), ["Lamb / Goat"]);
+  assert.deepEqual(s("Chicken Nuggets"), ["American", "Chicken"]);
+  assert.deepEqual(s("Burgers"), ["American"], "a burger can be beef, chicken or veggie");
   assert.deepEqual(s("Garlic Lemon Shrimp"), ["Seafood"]);
   assert.deepEqual(s("Boiled Eggs"), ["Eggs"]);
   assert.deepEqual(s("Salad"), []);
@@ -89,7 +92,7 @@ test("migration is safe on empty and messy input", () => {
 
 test("only tags a name settles outright are applied without asking", () => {
   const o = (n) => TagTools.obviousTags(n);
-  assert.deepEqual(o("Pasta & Meatballs"), ["Italian", "Beef", "Carby"]);
+  assert.deepEqual(o("Pasta & Meatballs"), ["Italian", "Carby"]);
   assert.deepEqual(o("Cereal & Milk"), ["American", "Quick", "Low Effort"]);
   assert.deepEqual(o("Boiled Eggs"), ["Eggs", "Quick", "Low Effort"]);
   assert.deepEqual(o("Avocado Toast"), ["American", "Quick", "Low Effort"]);
@@ -109,7 +112,7 @@ test("resetting clears every guessed tag, keeps checkable ones, applies obvious 
   ];
   const backup = TagTools.resetGuessedTags(meals);
   assert.deepEqual(meals[0].tags, ["Italian", "Zesty", "Carby"], "own tag kept, guessed ones gone, obvious one applied");
-  assert.deepEqual(meals[1].tags, ["Indian", "New Recipe", "Lamb / Goat"]);
+  assert.deepEqual(meals[1].tags, ["Indian", "New Recipe"]);
   assert.deepEqual(meals[2].tags, ["Indian", "Vegetarian"]);
   assert.deepEqual(meals[3].tags, ["Chinese", "Takeout / Restaurant Night", "Quick", "Low Effort"]);
   meals.forEach((m) => assert.equal(m.tagsReviewed, false));
@@ -120,4 +123,18 @@ test("resetting clears every guessed tag, keeps checkable ones, applies obvious 
 test("resetting is safe on empty and messy input", () => {
   assert.deepEqual(TagTools.resetGuessedTags([]), {});
   assert.doesNotThrow(() => TagTools.resetGuessedTags([{ id: "x", name: null, tags: null }, { id: "y" }]));
+});
+
+test("removes protein tags that only an old name guess supported", () => {
+  const r = TagTools.removeAssumedProteins;
+  assert.deepEqual(r("Gosht", ["Indian", "Lamb / Goat"]), ["Indian"]);
+  assert.deepEqual(r("Talawa Gosht", ["Lamb / Goat"]), []);
+  assert.deepEqual(r("Lamb Gosht", ["Lamb / Goat"]), ["Lamb / Goat"], "the name actually says lamb");
+  assert.deepEqual(r("Pasta & Meatballs", ["Italian", "Beef"]), ["Italian"]);
+  assert.deepEqual(r("Beef Meatballs", ["Beef"]), ["Beef"]);
+  assert.deepEqual(r("Burgers", ["Beef"]), []);
+  assert.deepEqual(r("Chicken Nuggets", ["Chicken"]), ["Chicken"]);
+  assert.deepEqual(r("Nuggets", ["Chicken"]), []);
+  assert.deepEqual(r("Salad", ["Beef"]), ["Beef"], "a tag the old rules never guessed is left alone");
+  assert.deepEqual(r(null, null), []);
 });

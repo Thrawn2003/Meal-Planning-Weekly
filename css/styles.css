@@ -360,6 +360,31 @@ main#app {
   color: var(--brown-dark);
 }
 
+.research-note,
+.tag-review-research {
+  background: var(--white);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  margin: 0.4rem 0 0.7rem;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  flex-basis: 100%;
+}
+
+.tag-review-research .research-note {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+.research-note a,
+.tag-review-research a {
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
 .tag-review-auto {
   background: var(--beige-light);
   border-radius: 10px;

@@ -45,7 +45,7 @@ It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, n
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 
-To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js` (Node 18+, no dependencies).
+To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js test/dish-knowledge.test.js` (Node 18+, no dependencies).
 
 ## Saving as a PDF
 
@@ -63,9 +63,18 @@ Tags are grouped. Cuisine and main protein can be checked against the meal itsel
 - **Practical**: Good for Leftovers, Freezer-Friendly, Budget-Friendly
 - **Occasion**: Takeout / Restaurant Night, Weekend / Special, New Recipe
 
-**Nothing is assumed.** A meal only gets a tag if its name settles it outright (Pasta → Italian + Carby, Cereal → Quick + Low Effort, Date Night → Weekend / Special) or you ticked it yourself. Whether a meal is healthy, a kid-favorite, how hard it is, or whether it's gluten-free can't be known from a name, so those are asked about, never guessed.
+**Nothing is assumed.** A meal only gets a tag if its name settles it outright (Pasta → Italian + Carby, Cereal → Quick + Low Effort, Date Night → Weekend / Special), if research on that dish backs it up (below), or you ticked it yourself. Whether a meal is healthy, a kid-favorite, spicy in *your* kitchen, or homemade vs. store-bought can't be known from a name, so those are asked about, never guessed. Words that don't pin down a protein don't set one: "gosht" just means meat, and meatballs, burgers and nuggets can each be made from several meats.
 
-**Tag review.** The first time you open this version, every effort, diet, family, practical and occasion tag from older versions is cleared (a backup of your old tags is kept in the browser as `mpw_tags_backup_v3`), the obvious ones are applied, and Add New Meal shows a **Start tag review** banner. It walks through your meals one at a time with the obvious tags pre-ticked: tick what's true, then Save & next (or Skip). Meals you add or edit yourself count as reviewed.
+**Researched dishes** (`js/dish-knowledge.js`). About 25 common dishes (upma, aloo paratha, maash and khatti daal, bhindi, chicken / beef / vegetable salan, shrimp dishes, tacos, French toast, tuna melt, boiled eggs, oatmeal and more) were checked against recipe sites and USDA food-safety guidance. Each one records only what holds for the standard dish, with a note and links to its sources, shown on the review screen and when you type a matching name on Add New Meal. Effort tags follow the median total time across the recipes found:
+
+- **Quick**: about 20 minutes or less, start to finish
+- **Low Effort**: about 21 to 45 minutes, or very little hands-on work (baked chicken thighs: 40+ minutes in the oven, 5 to 10 of work)
+- **High Effort**: about 90 minutes or more, or dough / frying / several components (beef curry simmers 1 to 2 hours)
+- 46 to 89 minutes (chicken salan, khatti daal): no effort tag, since it's neither
+
+Where a dish varies too much to call (samosa: homemade ≈ 2 h 40 min, store-bought ≈ minutes; spaghetti and meatballs: 35 min to 2.5 h; kebabs; talawa gosht's protein), only the facts that always hold are tagged (e.g. samosas and kebab mixtures freeze) and the rest is left for you. A dish with no research entry gets only the obvious tags.
+
+**Tag review.** The first time you open this version, every effort, diet, family, practical and occasion tag from older versions is cleared (a backup of your old tags is kept in the browser as `mpw_tags_backup_v3`), the obvious and researched ones are applied (and protein guesses the name doesn't support are removed), and Add New Meal shows a **Start tag review** banner. It walks through your meals one at a time with the obvious and researched tags pre-ticked and explained: tick what's true, then Save & next (or Skip). Meals you add or edit yourself count as reviewed.
 
 When you type a meal's name on Add New Meal, it suggests the obvious tags as one-click chips. Add your own tags from the "+ Add Tag" box; tags you added (not the built-in ones) can be removed with the "×" next to them, which also strips them from any meals that had them.
 

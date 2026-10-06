@@ -35,10 +35,12 @@ const TagTools = (() => {
     ["Italian", /\b(italian|pizza|pasta|spaghetti|lasagn[ae]|meatballs?|ravioli|risotto|alfredo|penne|fettuccine|gnocchi|parmesan|carbonara|bolognese)\b/i],
     ["American", /\b(american|burgers?|hot ?dogs?|sandwich(es)?|bagels?|pancakes?|waffles?|french toast|toast|cereal|croissants?|nuggets?|mac (and|&|n) cheese|grilled cheese|tuna melt|blt|bbq|barbecue|diner|meatloaf|fries)\b/i],
   ];
+  // Only words that name the meat itself. "Gosht" just means meat (beef, mutton or goat), and meatballs,
+  // burgers, nuggets and meatloaf can each be made from several meats, so those are asked, never assumed.
   const MEAT_RULES = [
-    ["Chicken", /\b(chicken|nuggets?|wings?)\b/i],
-    ["Beef", /\b(beef|burgers?|steak|brisket|meatballs?|meatloaf)\b/i],
-    ["Lamb / Goat", /\b(lamb|goat|mutton|gosht|ghost|rogan|nihari|haleem)\b/i],
+    ["Chicken", /\bchicken\b/i],
+    ["Beef", /\b(beef|steak|brisket)\b/i],
+    ["Lamb / Goat", /\b(lamb|goat|mutton|rogan)\b/i],
     ["Pork", /\b(pork|bacon|ham|sausages?|ribs|carnitas)\b/i],
     ["Seafood", /\b(shrimp|prawns?|fish|salmon|tuna|crab|lobster|cod|tilapia|seafood|scallops?|haddock|kedgeree|saltfish)\b/i],
   ];
@@ -117,6 +119,20 @@ const TagTools = (() => {
     };
   }
 
+
+  // Protein tags that earlier name rules guessed (gosht -> lamb/goat, meatballs/burgers -> beef,
+  // nuggets/wings -> chicken) but the name doesn't actually say. Removed from unconfirmed meals.
+  function removeAssumedProteins(name, tags) {
+    const n = String(name == null ? "" : name);
+    const supported = new Set(MEAT_RULES.filter(([, re]) => re.test(n)).map(([t]) => t));
+    const guessed = {
+      "Lamb / Goat": /\b(gosht|ghost|nihari|haleem)\b/i,
+      Beef: /\b(meatballs?|burgers?|meatloaf|kebabs?|kababs?)\b/i,
+      Chicken: /\b(nuggets?|wings?)\b/i,
+    };
+    return (tags || []).filter((t) => !(guessed[t] && guessed[t].test(n) && !supported.has(t)));
+  }
+
   // Clears every tag that can't be checked against the meal, applies the obvious ones, and marks the meal
   // as needing a quick review. Returns the old tags so nothing is lost for good.
   function resetGuessedTags(meals) {
@@ -131,7 +147,7 @@ const TagTools = (() => {
     return backup;
   }
 
-  return { GROUPS, ALL, RENAMES, DROPPED, KEPT_WHEN_RESETTING, suggestTags, obviousTags, mapTags, withInferredTags, migrateLibrary, resetGuessedTags };
+  return { GROUPS, ALL, RENAMES, DROPPED, KEPT_WHEN_RESETTING, suggestTags, obviousTags, mapTags, withInferredTags, migrateLibrary, resetGuessedTags, removeAssumedProteins };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = TagTools;

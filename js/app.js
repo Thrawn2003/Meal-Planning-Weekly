@@ -28,6 +28,7 @@ const STORAGE_KEYS = {
   phantomCleanup: "mpw_phantom_cleanup_v2",
   tagsV2: "mpw_tags_v2",
   tagsV3: "mpw_tags_v3",
+  tagsV4: "mpw_tags_v4",
   tagsBackupV3: "mpw_tags_backup_v3",
   routine: "mpw_routine",
 };
@@ -104,6 +105,21 @@ function migrateTagsV3(originalTags) {
   saveJSON(STORAGE_KEYS.tagsV3, true);
   const backup = TagTools.resetGuessedTags(state.meals);
   saveJSON(STORAGE_KEYS.tagsBackupV3, { ...backup, ...(originalTags || {}) });
+  persistMeals();
+}
+
+// For meals you haven't confirmed yet: drops protein guesses the name doesn't support (e.g. "gosht" does
+// not mean lamb), then adds the tags that research on the dish backs up (typical time, ingredients).
+// Meals you've reviewed or edited yourself are never touched.
+function migrateTagsV4() {
+  if (loadJSON(STORAGE_KEYS.tagsV4, false)) return;
+  saveJSON(STORAGE_KEYS.tagsV4, true);
+  state.meals.forEach((m) => {
+    if (m.tagsReviewed !== false) return;
+    const cleaned = TagTools.removeAssumedProteins(m.name, m.tags);
+    const filled = TagTools.withInferredTags({ name: m.name, tags: cleaned }).tags;
+    m.tags = DishKnowledge.applyToTags(m.name, filled);
+  });
   persistMeals();
 }
 
@@ -1088,15 +1104,36 @@ function renderTagCheckboxes() {
 // Offers tags that the meal's name makes obvious (cuisine, main protein, takeout) as one-click chips.
 const tagSuggestEl = document.getElementById("tag-suggest");
 
+// "Researched" note for a dish: what was found, with links to the sources.
+function buildResearchNote(research) {
+  const box = document.createElement("div");
+  box.className = "research-note";
+  box.appendChild(document.createTextNode("📚 Researched: " + research.note + " Sources: "));
+  research.sources.forEach((s, i) => {
+    if (i) box.appendChild(document.createTextNode(", "));
+    const a = document.createElement("a");
+    a.href = s.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = s.label;
+    box.appendChild(a);
+  });
+  return box;
+}
+
 function renderTagSuggestions() {
   const ticked = new Set(Array.from(mealTagsCheckboxesEl.querySelectorAll("input:checked")).map((cb) => cb.value));
-  const ideas = TagTools.obviousTags(mealNameInput.value).filter((t) => !ticked.has(t));
+  const name = mealNameInput.value;
+  const researched = DishKnowledge.lookup(name);
+  const ideas = DishKnowledge.applyToTags(name, TagTools.obviousTags(name)).filter((t) => !ticked.has(t));
   tagSuggestEl.innerHTML = "";
-  tagSuggestEl.classList.toggle("hidden", ideas.length === 0);
+  tagSuggestEl.classList.toggle("hidden", ideas.length === 0 && !researched);
+  if (!ideas.length && !researched) return;
+  if (researched) tagSuggestEl.appendChild(buildResearchNote(researched));
   if (!ideas.length) return;
   const label = document.createElement("span");
   label.className = "tag-suggest-label";
-  label.textContent = "Suggested from the name:";
+  label.textContent = researched ? "Suggested from the research:" : "Suggested from the name:";
   tagSuggestEl.appendChild(label);
   ideas.forEach((tag) => {
     const btn = document.createElement("button");
@@ -1124,6 +1161,7 @@ const tagReviewDoneEl = document.getElementById("tag-review-done");
 const tagReviewNameEl = document.getElementById("tag-review-name");
 const tagReviewProgressEl = document.getElementById("tag-review-progress");
 const tagReviewAutoEl = document.getElementById("tag-review-auto");
+const tagReviewResearchEl = document.getElementById("tag-review-research");
 const tagReviewTagsEl = document.getElementById("tag-review-tags");
 const reviewSkipped = new Set();
 let reviewingId = null;
@@ -1155,8 +1193,14 @@ function showReviewMeal() {
   tagReviewNameEl.textContent = meal.name;
   tagReviewProgressEl.textContent = `${pendingReviewCount()} left to check`;
 
-  const fromName = TagTools.obviousTags(meal.name).filter((t) => (meal.tags || []).includes(t));
-  tagReviewAutoEl.textContent = fromName.length ? "Already filled in from the name: " + fromName.join(", ") + ". Untick any that are wrong." : "";
+  const researched = DishKnowledge.lookup(meal.name);
+  tagReviewResearchEl.innerHTML = "";
+  tagReviewResearchEl.classList.toggle("hidden", !researched);
+  if (researched) tagReviewResearchEl.appendChild(buildResearchNote(researched));
+
+  const shown = DishKnowledge.applyToTags(meal.name, meal.tags || []);
+  const fromName = [...new Set([...TagTools.obviousTags(meal.name), ...(researched ? researched.tags : [])])].filter((t) => shown.includes(t));
+  tagReviewAutoEl.textContent = fromName.length ? "Already filled in from the " + (researched ? "research and name" : "name") + ": " + fromName.join(", ") + ". Untick any that are wrong for your family." : "";
   tagReviewAutoEl.classList.toggle("hidden", !fromName.length);
 
   tagReviewTagsEl.innerHTML = "";
@@ -1174,7 +1218,7 @@ function showReviewMeal() {
       const cb = document.createElement("input");
       cb.type = "checkbox";
       cb.value = tag;
-      cb.checked = (meal.tags || []).includes(tag);
+      cb.checked = shown.includes(tag);
       label.appendChild(cb);
       const span = document.createElement("span");
       span.textContent = tag;
@@ -1360,4 +1404,5 @@ removePhantomMeals();
 const tagsBeforeMigrations = Object.fromEntries(state.meals.map((m) => [m.id, (m.tags || []).slice()]));
 migrateTagsV2();
 migrateTagsV3(tagsBeforeMigrations);
+migrateTagsV4();
 showView("plan");
