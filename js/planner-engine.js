@@ -93,22 +93,30 @@ const PlannerEngine = (() => {
         const day = isoToDay(key.slice(0, cut));
         if (!Number.isFinite(day)) return;
         const slotKey = key.slice(cut + 1);
-        slotTotals[slotKey] = (slotTotals[slotKey] || 0) + 1;
-        const agg = perSlot[slotKey] || (perSlot[slotKey] = { filled: 0, names: new Set() });
-        agg.filled++;
-        agg.names.add(normName(text));
+        // A box Auto-Populate filled (it carries a "why" note) says what was planned, not what the family
+        // prefers: it counts for how recently a meal came up, but never as a habit, favorite or routine.
+        // Otherwise a few early weeks of repeats would teach the planner to keep repeating.
+        const auto = Array.isArray(cell.why) && cell.why.length > 0;
         weekCells++;
+        if (!auto) {
+          slotTotals[slotKey] = (slotTotals[slotKey] || 0) + 1;
+          const agg = perSlot[slotKey] || (perSlot[slotKey] = { filled: 0, names: new Set() });
+          agg.filled++;
+          agg.names.add(normName(text));
+        }
         const meal = matchMeal(idx, cell);
-        if (routineSlots.includes(slotKey)) {
+        if (!auto && routineSlots.includes(slotKey)) {
           routineCells.push({ slotKey, wd: weekdayOf(day), norm: normName(text), text, meal, weeksAgo: Math.abs(day - targetStartDay) / 7 });
         }
         if (!meal) return;
-        const si = slotIndian[slotKey] || (slotIndian[slotKey] = { indian: 0, total: 0 });
-        si.total++;
-        if (hasTag(meal, INDIAN)) si.indian++;
+        if (!auto) {
+          const si = slotIndian[slotKey] || (slotIndian[slotKey] = { indian: 0, total: 0 });
+          si.total++;
+          if (hasTag(meal, INDIAN)) si.indian++;
+        }
         let rec = byMeal.get(meal.id);
         if (!rec) byMeal.set(meal.id, (rec = []));
-        rec.push({ day, slotKey });
+        rec.push({ day, slotKey, auto });
         cellMeal.set(day + "|" + slotKey, meal);
         cells++;
         if (day < targetStartDay && day < earliestPast) earliestPast = day;
@@ -246,23 +254,23 @@ const PlannerEngine = (() => {
 
     // Which weekday / slot does this meal usually land on?
     let wdPart = 0;
-    if (st.count >= 2) {
-      const conf = Math.min(1, st.count / 4);
-      wdPart = conf * (st.weekdayCounts[wd] / st.count - 1 / 7) * 1.4;
+    if (st.humanCount >= 2) {
+      const conf = Math.min(1, st.humanCount / 4);
+      wdPart = conf * (st.weekdayCounts[wd] / st.humanCount - 1 / 7) * 1.4;
       if (st.weekdayCounts[wd] === 0) {
-        const topShare = Math.max(...st.weekdayCounts) / st.count;
-        const neverHere = Math.min(1, st.count / 7 / 2);
-        const dayBound = st.count >= 3 && topShare >= 0.75 ? 0.8 * conf : 0;
+        const topShare = Math.max(...st.weekdayCounts) / st.humanCount;
+        const neverHere = Math.min(1, st.humanCount / 7 / 2);
+        const dayBound = st.humanCount >= 3 && topShare >= 0.75 ? 0.8 * conf : 0;
         wdPart -= Math.max(neverHere, dayBound);
       }
     }
     parts.weekday = W.weekday * wdPart;
 
     let slotPart = 0;
-    if (st.count >= 3) {
+    if (st.humanCount >= 3) {
       const total = Object.values(st.slotCounts).reduce((a, b) => a + b, 0);
       const fit = meal.slots && meal.slots.length ? meal.slots.length : 6;
-      slotPart = Math.min(1, st.count / 5) * ((st.slotCounts[slotKey] || 0) / total - 1 / fit);
+      slotPart = Math.min(1, st.humanCount / 5) * ((st.slotCounts[slotKey] || 0) / total - 1 / fit);
     }
     parts.slot = W.slot * slotPart;
 
@@ -382,7 +390,7 @@ const PlannerEngine = (() => {
       const weeks = Math.max(1, Math.round(info.pastGap / 7));
       found.push([parts.rest, `Last had ${weeks} week${weeks === 1 ? "" : "s"} ago`]);
     }
-    if (scored.popScore >= 0.6 && st.count >= 3) found.push([parts.pop, `A family favorite (eaten ${st.count}×)`]);
+    if (scored.popScore >= 0.6 && st.humanCount >= 3) found.push([parts.pop, `A family favorite (eaten ${st.humanCount}×)`]);
     if (parts.weekday > 0.45) found.push([parts.weekday, `Usually a ${DOW[wd]} meal`]);
     if (parts.rhythm > 0.5) found.push([parts.rhythm, "Right on its usual schedule"]);
     if (parts.trend > 0.2) found.push([parts.trend * 2, "Trending up lately"]);
@@ -424,19 +432,22 @@ const PlannerEngine = (() => {
       let s = statsCache.get(meal.id);
       if (s) return s;
       const occ = H.byMeal.get(meal.id) || [];
-      const days = [...new Set(occ.map((o) => o.day))].sort((a, b) => a - b);
+      const unique = (list) => [...new Set(list.map((o) => o.day))].sort((a, b) => a - b);
+      const days = unique(occ); // every time it was planned: used for "how recently"
+      const humanOcc = occ.filter((o) => !o.auto);
+      const humanDays = unique(humanOcc); // what you chose yourself: used for habits and favorites
       const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
-      days.forEach((d) => weekdayCounts[weekdayOf(d)]++);
+      humanDays.forEach((d) => weekdayCounts[weekdayOf(d)]++);
       const slotCounts = {};
-      occ.forEach((o) => (slotCounts[o.slotKey] = (slotCounts[o.slotKey] || 0) + 1));
+      humanOcc.forEach((o) => (slotCounts[o.slotKey] = (slotCounts[o.slotKey] || 0) + 1));
       const gaps = [];
-      for (let i = 1; i < days.length; i++) gaps.push(days[i] - days[i - 1]);
+      for (let i = 1; i < humanDays.length; i++) gaps.push(humanDays[i] - humanDays[i - 1]);
       const medGap = gaps.length ? median(gaps) : 0;
       const meanGap = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 0;
       const gapSd = gaps.length ? Math.sqrt(gaps.reduce((a, g) => a + (g - meanGap) * (g - meanGap), 0) / gaps.length) : 0;
       const gapCv = meanGap ? gapSd / meanGap : 0;
-      const recent = days.filter((d) => d < weekStartDay && d >= weekStartDay - 42).length;
-      const older = days.filter((d) => d < weekStartDay - 42 && d >= weekStartDay - 168).length;
+      const recent = humanDays.filter((d) => d < weekStartDay && d >= weekStartDay - 42).length;
+      const older = humanDays.filter((d) => d < weekStartDay - 42 && d >= weekStartDay - 168).length;
       const olderSpan = clamp(H.spanPast - 42, 0, 126);
       let trend = 0;
       if (olderSpan >= 14) {
@@ -444,7 +455,7 @@ const PlannerEngine = (() => {
         const rateO = older / olderSpan;
         if (rateR + rateO > 0) trend = ((rateR - rateO) / (rateR + rateO)) * Math.min(1, (recent + older) / 3);
       }
-      s = { days, count: days.length, weekdayCounts, slotCounts, trend, gaps, gapCount: gaps.length, medGap, gapCv };
+      s = { days, count: days.length, humanCount: humanDays.length, weekdayCounts, slotCounts, trend, gaps, gapCount: gaps.length, medGap, gapCv };
       statsCache.set(meal.id, s);
       return s;
     };

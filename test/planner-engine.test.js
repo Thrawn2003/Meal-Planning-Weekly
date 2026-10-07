@@ -240,6 +240,42 @@ test("the family's own Indian share sets the weekly balance", () => {
   assert.ok(picked.filter((n) => isIndian(meals, n)).length >= 3, picked.join(","));
 });
 
+test("weeks Auto-Populate filled never teach the planner a habit (no self-reinforcing repeats)", () => {
+  // Early on the library was tiny, so whole weeks were filled with one meal per slot. That's what was
+  // planned, not what the family prefers, so a full library afterwards must not keep repeating it.
+  const lunches = ["Sandwich", "Wrap", "Soup", "Salad", "Pizza", "Noodles", "Burrito", "Quesadilla"].map((n) => mk(n, [NL]));
+  const breakfasts = ["Eggs", "Toast", "Cereal", "Oatmeal", "Yogurt", "Pancakes", "Bagel", "Smoothie"].map((n) => mk(n, [PB]));
+  const meals = [...lunches, ...breakfasts];
+  const autoWeek = (ws) => {
+    const cells = {};
+    for (let i = 0; i < 7; i++) {
+      cells[isoPlus(ws, i) + "_" + NL] = { mealId: "id-Sandwich", text: "Sandwich", why: ["Haven't had this one yet"] };
+      cells[isoPlus(ws, i) + "_" + PB] = { mealId: "id-Eggs", text: "Eggs", why: ["Haven't had this one yet"] };
+    }
+    return { weekStart: ws, cells };
+  };
+  const plans = {};
+  ["2026-09-27", "2026-09-20", "2026-09-13"].forEach((w) => (plans[w] = autoWeek(w)));
+  const res = run(meals, plans, plan());
+  assert.ok(new Set(names(res, NL)).size >= 6, "lunch locked on: " + names(res, NL).join(","));
+  assert.ok(new Set(names(res, PB)).size >= 4, "breakfast locked on: " + names(res, PB).join(","));
+  assert.ok(!res.assignments.some((a) => a.routine), "an auto-filled week must not become the routine");
+
+  // The same weeks chosen by hand (no auto note) are a genuine habit and are respected.
+  const chosen = JSON.parse(JSON.stringify(plans));
+  Object.values(chosen).forEach((p) => Object.values(p.cells).forEach((c) => delete c.why));
+  const habit = run(meals, chosen, plan());
+  assert.deepEqual(names(habit, PB), Array(7).fill("Eggs"));
+});
+
+test("auto-filled weeks still count for how recently a meal was planned", () => {
+  const meals = dinners(10);
+  const cells = {};
+  for (let i = 0; i < 7; i++) cells[isoPlus("2026-09-27", i) + "_" + KD] = { mealId: meals[i].id, text: meals[i].name, why: ["x"] };
+  const picked = names(run(meals, { "2026-09-27": { weekStart: "2026-09-27", cells } }, plan()), KD);
+  ["DinnerH", "DinnerI", "DinnerJ"].forEach((fresh) => assert.ok(picked.includes(fresh), "the never-planned " + fresh + " should be used first: " + picked.join(",")));
+});
+
 test("limits takeout nights in a week", () => {
   const meals = [...dinners(6), ...["T1", "T2", "T3", "T4", "T5", "T6"].map((n) => mk(n, [KD], [TAKEOUT]))];
   for (let i = 0; i < 5; i++) {
