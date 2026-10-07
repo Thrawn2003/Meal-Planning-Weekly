@@ -785,6 +785,18 @@ document.getElementById("auto-populate-btn").addEventListener("click", () => {
       text: `${skipped} box${skipped === 1 ? "" : "es"} had no eligible meal. Add meals for those slots, or loosen your filters.`,
     });
   }
+  // Say plainly when a row has too few choices to vary (slot settings or filters), the usual cause of repeats.
+  const thin = SLOTS.map((s) => {
+    const fits = state.meals.filter((m) => mealFitsSlot(m, s.key));
+    const open = fits.filter((m) => mealPassesFilters(m, plan.weekStart));
+    return { label: s.label, fits: fits.length, open: open.length };
+  }).filter((t) => t.open < 5);
+  thin.forEach((t) => {
+    const hidden = t.fits - t.open;
+    lines.push({
+      text: `${t.label} ${t.open ? `only has ${t.open} meal${t.open === 1 ? "" : "s"}` : "has no meals"} to choose from${hidden > 0 ? ` (${hidden} more hidden by your filters)` : ""}, so ${t.open ? "it will repeat" : "it stays empty"}. Add ${t.open ? "more " : ""}meals for this slot in Add New Meal${hidden > 0 ? " or loosen the filters" : ""}.`,
+    });
+  });
   if (filled && result.stats.historyCells < 20) {
     lines.push({ text: "Tip: suggestions get smarter as you save more weeks of your own meals.", small: true });
   }
@@ -1406,3 +1418,12 @@ migrateTagsV2();
 migrateTagsV3(tagsBeforeMigrations);
 migrateTagsV4();
 showView("plan");
+
+// If the browser kept an older copy of the planner, say so instead of quietly planning badly.
+if (PlannerEngine.BUILD !== "2026-10-07a") {
+  const warn = document.createElement("div");
+  warn.setAttribute("role", "alert");
+  warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";
+  warn.textContent = "Your browser is showing an old copy of this site. Press Ctrl+F5 (or Cmd+Shift+R on a Mac) to load the latest.";
+  document.body.appendChild(warn);
+}
