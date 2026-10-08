@@ -423,7 +423,7 @@ const PlannerEngine = (() => {
     const eligible = {};
     slotKeys.forEach((k) => (eligible[k] = meals.filter((m) => isEligible(m, k))));
 
-    const routineSlotList = (opts.routineSlots || ROUTINE_SLOTS).filter((k) => slotKeys.includes(k));
+    const routineSlotList = opts.useRoutine === false ? [] : (opts.routineSlots || ROUTINE_SLOTS).filter((k) => slotKeys.includes(k));
     const H = buildHistory(meals, plans, plan.weekStart, weekStartDay, routineSlotList);
     const idx = indexMeals(meals);
 
@@ -523,7 +523,7 @@ const PlannerEngine = (() => {
     const routineOk = opts.routineOk || (() => true);
     const learn = (slotKey, wd) => {
       const rows = H.routineCells.filter((c) => c.slotKey === slotKey && c.wd === wd && c.weeksAgo <= 12);
-      if (rows.length < 2) return null;
+      if (new Set(rows.map((c) => c.weeksAgo)).size < 3) return null; // a routine needs 3 different weeks of evidence
       const agg = new Map();
       let total = 0;
       rows.forEach((r) => {
@@ -575,11 +575,21 @@ const PlannerEngine = (() => {
       const skipped = [];
       let total = 0;
       order.forEach(({ d, slotKey }) => {
-        const cands = eligible[slotKey];
-        if (!cands.length) {
+        const all = eligible[slotKey];
+        if (!all.length) {
           skipped.push({ d, slotKey });
           return;
         }
+        // Variety is a rule, not a preference: however strong the history, no meal fills more than its fair
+        // share of a row (once a week when there are 7+ meals to choose from).
+        const cap = Math.ceil(7 / all.length);
+        const usedInRow = (m) => {
+          let n = 0;
+          for (let x = 0; x < 7; x++) if (ctx.assign.get(x + "|" + slotKey) === m) n++;
+          return n;
+        };
+        const open = all.filter((m) => usedInRow(m) < cap);
+        const cands = open.length ? open : all;
         let best = null;
         cands.forEach((m) => {
           const scored = scoreCandidate(m, d, slotKey, ctx, S);
@@ -624,11 +634,20 @@ const PlannerEngine = (() => {
     return {
       assignments,
       skipped: best.skipped.map((s) => dayToISO(weekStartDay + s.d) + "_" + s.slotKey),
-      stats: { filled: assignments.length, routine: routineOut.length, historyCells: H.cells, historyWeeks: H.weeks },
+      stats: {
+        filled: assignments.length,
+        routine: routineOut.length,
+        routineMeals: routineOut.reduce((o, r) => {
+          (o[r.slotKey] = o[r.slotKey] || {})[r.text] = ((o[r.slotKey] || {})[r.text] || 0) + 1;
+          return o;
+        }, {}),
+        historyCells: H.cells,
+        historyWeeks: H.weeks,
+      },
     };
   }
 
-  return { planWeek, BUILD: "2026-10-07a" };
+  return { planWeek, BUILD: "2026-10-08a" };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = PlannerEngine;

@@ -928,3 +928,18 @@ table.week-table tbody tr:nth-child(even) td {
     margin: 12mm;
   }
 }
+
+.routine-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+.routine-toggle input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--green, #5b7f3a);
+}

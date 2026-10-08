@@ -35,13 +35,13 @@ Click **✨ Auto-Populate Week** to fill every *empty* box with the best-fitting
 It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, no API, no accounts, no cost**; everything is calculated in your browser from your own saved weeks. For each box it scores every eligible meal on:
 
 - **How long since you last had it**, judged against how often that meal normally comes around (a weekly meal is "due" sooner than a once-a-month one). Meals you've never tried get a small exploration boost.
-- **Popularity and habits**: what your family eats most in that slot, learned per slot — so a daily breakfast can repeat all week while dinners stay varied.
+- **Popularity and habits**: what your family eats most in that slot, a gentle nudge toward favorites, never a takeover: no meal fills more than its fair share of a row (once a week when you have 7 or more meals for that slot). Only the Parents routine below repeats on purpose.
 - **Weekday and slot patterns**: a meal that's always eaten on Saturdays stays on Saturdays.
 - **Trends and seasonality**: meals you've been eating more lately, and what you ate around this time last year.
 - **A balanced week**: quick meals on busy weeknights, big cooking and takeout on relaxed days, at most two takeout nights, no back-to-back heavy-cooking days, a mix of proteins and cuisines, and no unwanted repeats.
 - **Alternating, balanced breakfasts**: Indian and non-Indian breakfasts are alternated and spaced out day to day (including from the end of last week and around boxes you filled by hand), and each week keeps the family's usual mix, so "haven't had it in a while" can't tip it to all one kind. Weekly rituals (like a Saturday special) are exempt, and it only applies when both kinds are available for that slot. Cuisine and protein are recognized from the meal's name when a meal has no tag for them.
 
-**Parents Breakfast and Parents Lunch** aren't varied: they repeat your usual for each weekday (what you had on that weekday in most of your recent saved weeks, or the routine you saved with **📌 Save this week as my routine**). **Parents Dinner** boxes you've already filled are never touched, and count toward the week's variety.
+**Parents Breakfast and Parents Lunch** repeat your usual for each weekday (what you had on that weekday in the same way across at least 3 of your recent hand-filled weeks, or the routine you saved with **📌 Save this week as my routine**). Auto-Populate tells you exactly what it repeated, and the **Repeat my usual** checkbox under *Parents' usual routine* turns this off so those rows vary like all the others. **Parents Dinner** boxes you've already filled are never touched, and count toward the week's variety.
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 

@@ -108,7 +108,7 @@ test("running again with the previous picks gives a different (still sensible) o
   assert.equal(new Set(picked).size, picked.length);
 });
 
-test("repeats a family habit slot and keeps a weekly ritual on its day", () => {
+test("a family's favorite never takes over a row, but a weekly ritual keeps its day", () => {
   const meals = ["Oatmeal", "Toast", "Cereal", "Pancakes", "Yogurt"].map((n) => mk(n, [PB]));
   const habit = ["Oatmeal", "Oatmeal", "Oatmeal", "Oatmeal", "Oatmeal", "Oatmeal", "Pancakes"];
   const plans = {
@@ -118,7 +118,8 @@ test("repeats a family habit slot and keeps a weekly ritual on its day", () => {
   };
   const picked = names(run(meals, plans, plan(), { routineSlots: [] }), PB);
   assert.equal(picked[6], "Pancakes");
-  assert.ok(picked.slice(0, 6).filter((n) => n === "Oatmeal").length >= 4, picked.join(","));
+  assert.ok(picked.filter((n) => n === "Oatmeal").length <= 2, picked.join(","));
+  assert.ok(new Set(picked).size >= 4, picked.join(","));
 });
 
 const INDIAN = "Indian";
@@ -154,14 +155,15 @@ test("breakfast alternation continues from last week's Saturday", () => {
   assert.ok(!isIndian(meals, picked[0]), "Sunday after an Indian Saturday: " + picked.join(","));
 });
 
-test("alternation does not break a daily habit breakfast", () => {
+test("Indian/non-Indian alternation works inside the variety rule", () => {
   const meals = [mk("Boiled Eggs", [PB]), mk("Special Anda", [PB], [INDIAN]), mk("Indian Oatmeal", [PB], [INDIAN]), mk("Toast", [PB])];
   const habit = ["Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Indian Oatmeal", "Special Anda"];
   const plans = {};
   ["2026-09-27", "2026-09-20", "2026-09-13"].forEach((w) => (plans[w] = week(w, { [PB]: habit }, meals)));
   const picked = names(run(meals, plans, plan(), { routineSlots: [] }), PB);
-  assert.ok(picked.slice(0, 5).filter((n) => n === "Boiled Eggs").length >= 3, picked.join(","));
-  assert.equal(picked[6], "Special Anda");
+  assert.ok(picked.filter((n) => n === "Boiled Eggs").length <= 2, picked.join(","));
+  const indian = picked.filter((n) => isIndian(meals, n)).length;
+  assert.ok(indian >= 2 && indian <= 5, "indian count " + indian + ": " + picked.join(","));
 });
 
 test("parents breakfast and lunch repeat the usual week, even when other meals are fresher", () => {
@@ -199,7 +201,7 @@ test("a saved routine wins over history, and unavailable routine meals fall back
   const plans = { "2026-09-27": week("2026-09-27", { [PB]: Array(7).fill("Eggs") }, meals), "2026-09-20": week("2026-09-20", { [PB]: Array(7).fill("Eggs") }, meals) };
   const routine = { [PB]: Array(7).fill({ mealId: "id-Toast", text: "Toast" }) };
   assert.deepEqual(names(run(meals, plans, plan(), { routine }), PB), Array(7).fill("Toast"));
-  const noToast = run(meals, plans, plan(), { routine, routineOk: (m) => m.name !== "Toast" });
+  const noToast = run(meals, plans, plan(), { routine, routineOk: (m) => m.name !== "Toast", isEligible: (m, k) => m.name !== "Toast" && eligible(m, k) });
   assert.ok(!names(noToast, PB).includes("Toast"));
   assert.equal(names(noToast, PB).length, 7);
   const typed = run(meals, {}, plan(), { routine: { [PB]: Array(7).fill({ mealId: null, text: "Grandma's porridge" }) } });
@@ -337,4 +339,66 @@ test("stays fast with a big library and a long history", () => {
   const res = run(meals, plans, plan());
   assert.ok(Date.now() - t0 < 2500);
   assert.equal(names(res, KD).length, 7);
+});
+
+/* ---------- Guarantees that hold for any library and any history ---------- */
+
+function lcg(seed) {
+  let x = seed >>> 0;
+  return () => ((x = (Math.imul(x, 1664525) + 1013904223) >>> 0) / 4294967296);
+}
+
+test("for any library and history: every box is filled and no meal takes over a row", () => {
+  const SLOT_KEYS = SLOTS.map((s) => s.key);
+  for (let seed = 1; seed <= 40; seed++) {
+    const rnd = lcg(seed * 7919);
+    const perSlot = 1 + Math.floor(rnd() * 12);
+    const meals = [];
+    SLOT_KEYS.forEach((k) => {
+      for (let i = 0; i < perSlot; i++) meals.push(mk(k.slice(0, 3) + i, [k], rnd() < 0.3 ? [INDIAN] : []));
+    });
+    // Hand-chosen history that leans very hard on one meal per slot, the worst case for runaway repeats.
+    const plans = {};
+    for (let w = 1; w <= 1 + Math.floor(rnd() * 6); w++) {
+      const ws = isoPlus("2026-09-27", -7 * (w - 1));
+      const cells = {};
+      for (let d = 0; d < 7; d++) {
+        SLOT_KEYS.forEach((k) => {
+          const pool = meals.filter((m) => m.slots[0] === k);
+          const m = rnd() < 0.85 ? pool[0] : pool[Math.floor(rnd() * pool.length)];
+          cells[isoPlus(ws, d) + "_" + k] = { mealId: m.id, text: m.name };
+        });
+      }
+      plans[ws] = { weekStart: ws, cells };
+    }
+    const res = run(meals, plans, plan(), { seed: "s" + seed, restarts: 6, useRoutine: false });
+    assert.equal(res.assignments.length, 42, "seed " + seed + " left boxes empty");
+    SLOT_KEYS.forEach((k) => {
+      const row = names(res, k);
+      const counts = row.reduce((c, n) => ((c[n] = (c[n] || 0) + 1), c), {});
+      const cap = Math.ceil(7 / perSlot);
+      assert.ok(Math.max(...Object.values(counts)) <= cap, `seed ${seed} ${k}: ${row.join(",")} (cap ${cap})`);
+    });
+  }
+});
+
+test("turning the routine off makes Parents Breakfast and Lunch vary like every other row", () => {
+  const meals = ["Avocado Toast", "Eggs", "Oatmeal", "Cereal", "Bagel", "Yogurt", "Pancakes", "Smoothie"].map((n) => mk(n, [PB]));
+  const plans = {};
+  ["2026-09-27", "2026-09-20", "2026-09-13", "2026-09-06"].forEach((w) => (plans[w] = week(w, { [PB]: Array(7).fill("Avocado Toast") }, meals)));
+  const usual = run(meals, plans, plan());
+  assert.deepEqual(names(usual, PB), Array(7).fill("Avocado Toast"));
+  assert.deepEqual(usual.stats.routineMeals, { [PB]: { "Avocado Toast": 7 } });
+  const varied = run(meals, plans, plan(), { useRoutine: false });
+  assert.equal(new Set(names(varied, PB)).size, 7, names(varied, PB).join(","));
+  assert.equal(varied.stats.routine, 0);
+});
+
+test("a routine needs three different weeks of evidence", () => {
+  const meals = ["Avocado Toast", "Eggs", "Oatmeal", "Cereal", "Bagel", "Yogurt", "Pancakes"].map((n) => mk(n, [PB]));
+  const plans = {};
+  ["2026-09-27", "2026-09-20"].forEach((w) => (plans[w] = week(w, { [PB]: Array(7).fill("Avocado Toast") }, meals)));
+  const res = run(meals, plans, plan());
+  assert.equal(res.stats.routine, 0);
+  assert.equal(new Set(names(res, PB)).size, 7);
 });

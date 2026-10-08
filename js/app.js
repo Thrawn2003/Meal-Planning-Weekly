@@ -31,6 +31,7 @@ const STORAGE_KEYS = {
   tagsV4: "mpw_tags_v4",
   tagsBackupV3: "mpw_tags_backup_v3",
   routine: "mpw_routine",
+  useRoutine: "mpw_use_routine",
 };
 
 const DEFAULT_TAGS = TagTools.ALL;
@@ -152,6 +153,7 @@ const state = {
   filters: loadJSON(STORAGE_KEYS.filters, { excludedTags: [], recencyWeeks: 0 }),
   customTags: loadJSON(STORAGE_KEYS.customTags, []),
   routine: loadJSON(STORAGE_KEYS.routine, {}), // { slotKey: [7 x {mealId, text} | null], by weekday Sun..Sat }
+  useRoutine: loadJSON(STORAGE_KEYS.useRoutine, true),
   calendarYear: new Date().getFullYear(),
   calendarFirstClick: null, // ISO date string
   currentWeekKey: loadJSON(STORAGE_KEYS.currentWeekKey, null),
@@ -740,6 +742,7 @@ document.getElementById("auto-populate-btn").addEventListener("click", () => {
     isEligible: (m, slotKey) => mealFitsSlot(m, slotKey) && mealPassesFilters(m, plan.weekStart),
     // Usual parents breakfast/lunch ignore the "recently used" filter (they repeat by design) but not tag filters.
     routine: state.routine,
+    useRoutine: state.useRoutine,
     routineOk: mealPassesTagFilters,
     seed: `${plan.weekStart}#${roll}`,
     avoid: autoLastPicks.get(plan.weekStart) || {},
@@ -773,10 +776,13 @@ document.getElementById("auto-populate-btn").addEventListener("click", () => {
   if (filled) {
     lines.push({ text: `✨ Filled ${filled} empty box${filled === 1 ? "" : "es"}. Boxes you'd already filled (including Parents Dinner) were left alone.` });
     if (result.stats.routine) {
-      lines.push({ text: `📌 ${result.stats.routine} Parents Breakfast/Lunch box${result.stats.routine === 1 ? "" : "es"} repeat your usual routine.`, small: true });
+      const what = Object.entries(result.stats.routineMeals || {})
+        .map(([k, meals]) => `Parents ${ROUTINE_LABELS[k] || k}: ${Object.entries(meals).map(([name, n]) => `${name} ×${n}`).join(", ")}`)
+        .join(" · ");
+      lines.push({ text: `📌 Repeating your usual → ${what}. Not what you want? Untick "Repeat my usual" under Parents' usual routine and run it again.`, small: true });
     }
     lines.push({
-      text: "The other picks weigh how long it's been since you last had each meal, what your family eats most, which days it usually lands on, a balance of Indian and non-Indian breakfasts, and a balanced mix of effort, takeout and proteins. Look for the ✨ note under each meal to see why it was chosen.",
+      text: "The other picks weigh how long it's been since you last had each meal, what your family eats most, which days it usually lands on, never the same meal over and over in one row, a balance of Indian and non-Indian breakfasts, and a balanced mix of effort, takeout and proteins. Look for the ✨ note under each meal to see why it was chosen.",
       small: true,
     });
   }
@@ -832,7 +838,17 @@ function renderRoutinePanel() {
     routineSummaryEl.appendChild(p);
   });
   routineForgetBtn.classList.toggle("hidden", !saved.length);
+  routineUseEl.checked = state.useRoutine !== false;
+  routineOffNoteEl.classList.toggle("hidden", state.useRoutine !== false);
 }
+
+const routineUseEl = document.getElementById("routine-use");
+const routineOffNoteEl = document.getElementById("routine-off-note");
+routineUseEl.addEventListener("change", () => {
+  state.useRoutine = routineUseEl.checked;
+  saveJSON(STORAGE_KEYS.useRoutine, state.useRoutine);
+  renderRoutinePanel();
+});
 
 document.getElementById("routine-save-btn").addEventListener("click", () => {
   const plan = currentPlan();
@@ -1420,7 +1436,7 @@ migrateTagsV4();
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-07a") {
+if (PlannerEngine.BUILD !== "2026-10-08a") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";
