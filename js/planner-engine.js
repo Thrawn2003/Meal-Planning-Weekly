@@ -681,7 +681,7 @@ const PlannerEngine = (() => {
     };
   }
 
-  return { planWeek, BUILD: "2026-10-08b" };
+  return { planWeek, BUILD: "2026-10-08c" };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = PlannerEngine;

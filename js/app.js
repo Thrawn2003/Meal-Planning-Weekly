@@ -620,6 +620,12 @@ function renderWeekTable() {
     const tr = document.createElement("tr");
     const th = document.createElement("th");
     th.textContent = slot.label;
+    // How many saved meals Auto-Populate can use for this row: the cause of most "it keeps repeating" problems.
+    const usable = state.meals.filter((m) => mealFitsSlot(m, slot.key) && mealPassesFilters(m, plan.weekStart)).length;
+    const countEl = document.createElement("span");
+    countEl.className = "row-meal-count" + (usable < 7 ? " row-meal-count-low" : "");
+    countEl.textContent = usable === 0 ? "no meals ticked for this row" : `${usable} meal${usable === 1 ? "" : "s"} for this row`;
+    th.appendChild(countEl);
     tr.appendChild(th);
 
     dates.forEach((d) => {
@@ -1440,7 +1446,7 @@ migrateTagsV4();
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-08b") {
+if (PlannerEngine.BUILD !== "2026-10-08c") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";
