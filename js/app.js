@@ -33,6 +33,7 @@ const STORAGE_KEYS = {
   routine: "mpw_routine",
   useRoutine: "mpw_use_routine",
   slideMealsV1: "mpw_slide_meals_v1",
+  slideMealsV2: "mpw_slide_meals_v2",
 };
 
 const DEFAULT_TAGS = TagTools.ALL;
@@ -135,6 +136,21 @@ function importSlideMeals() {
     DishKnowledge.applyToTags(name, TagTools.withInferredTags({ name, tags: [] }).tags)
   );
   if (out.added || out.widened || out.tagged) persistMeals();
+}
+
+// One time, after the first import: applies what the family told us (store-bought vs homemade, quick dishes),
+// fixes the old "Simone's Chimichurri Chicken" name, and saves the slideshow's four dated weeks as history so
+// Auto-Populate can learn the usual Parents Breakfast and Lunch. Boxes you filled yourself are never touched.
+function importSlideMealsV2() {
+  if (loadJSON(STORAGE_KEYS.slideMealsV2, false)) return;
+  saveJSON(STORAGE_KEYS.slideMealsV2, true);
+  const tagsFor = (name) => DishKnowledge.applyToTags(name, TagTools.withInferredTags({ name, tags: [] }).tags);
+  SlideMeals.fixOldNames(state.meals);
+  SlideMeals.mergeInto(state.meals, tagsFor);
+  SlideMeals.applyFamilyAnswers(state.meals);
+  SlideMeals.mergeHistory(state.plans, state.meals);
+  persistMeals();
+  persistPlans();
 }
 
 /* ---------------------- Storage helpers ---------------------- */
@@ -1457,10 +1473,11 @@ migrateTagsV2();
 migrateTagsV3(tagsBeforeMigrations);
 migrateTagsV4();
 importSlideMeals();
+importSlideMealsV2();
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-08d") {
+if (PlannerEngine.BUILD !== "2026-10-08e") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";
