@@ -32,6 +32,7 @@ const STORAGE_KEYS = {
   tagsBackupV3: "mpw_tags_backup_v3",
   routine: "mpw_routine",
   useRoutine: "mpw_use_routine",
+  slideMealsV1: "mpw_slide_meals_v1",
 };
 
 const DEFAULT_TAGS = TagTools.ALL;
@@ -122,6 +123,18 @@ function migrateTagsV4() {
     m.tags = DishKnowledge.applyToTags(m.name, filled);
   });
   persistMeals();
+}
+
+// One time: adds the meals from the family's slideshow of previous weeks (names and slots straight from the
+// slides, only obvious tags). Meals you already have keep their tags and just gain the slots they were served
+// in; nothing is removed, and meals you delete later are not brought back.
+function importSlideMeals() {
+  if (loadJSON(STORAGE_KEYS.slideMealsV1, false)) return;
+  saveJSON(STORAGE_KEYS.slideMealsV1, true);
+  const out = SlideMeals.mergeInto(state.meals, (name) =>
+    DishKnowledge.applyToTags(name, TagTools.withInferredTags({ name, tags: [] }).tags)
+  );
+  if (out.added || out.widened || out.tagged) persistMeals();
 }
 
 /* ---------------------- Storage helpers ---------------------- */
@@ -1146,7 +1159,7 @@ const tagSuggestEl = document.getElementById("tag-suggest");
 function buildResearchNote(research) {
   const box = document.createElement("div");
   box.className = "research-note";
-  box.appendChild(document.createTextNode("📚 Researched: " + research.note + " Sources: "));
+  box.appendChild(document.createTextNode("📚 Researched: " + research.note + (research.sources.length ? " Sources: " : "")));
   research.sources.forEach((s, i) => {
     if (i) box.appendChild(document.createTextNode(", "));
     const a = document.createElement("a");
@@ -1443,10 +1456,11 @@ const tagsBeforeMigrations = Object.fromEntries(state.meals.map((m) => [m.id, (m
 migrateTagsV2();
 migrateTagsV3(tagsBeforeMigrations);
 migrateTagsV4();
+importSlideMeals();
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-08c") {
+if (PlannerEngine.BUILD !== "2026-10-08d") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";

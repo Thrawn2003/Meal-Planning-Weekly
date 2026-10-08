@@ -45,7 +45,7 @@ It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, n
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 
-To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js test/dish-knowledge.test.js` (Node 18+, no dependencies).
+To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js test/dish-knowledge.test.js test/slide-meals.test.js` (Node 18+, no dependencies).
 
 ## Saving as a PDF
 
@@ -87,3 +87,7 @@ The planner itself still recognizes cuisine and protein from a meal's name when 
 The meal library starts empty — add your own real meals and their info on the Add New Meal page. Add, edit (delete + re-add), or clear meals anytime; clicking "Clear All Meals" is permanent.
 
 **Few meals ticked for a slot?** A meal only counts for the slots ticked on it. If a row has fewer than 7 of its own, Auto-Populate borrows meals ticked for the matching slot at the same time of day (Kids Breakfast ↔ Parents Breakfast, Namath/Parents Lunch, Kids/Parents Dinner) rather than repeating one meal, notes it under each borrowed box, and tells you which slots to tick on more meals. A row with nothing ticked stays empty.
+
+## Meals from the family's slideshow
+
+The first time the site loads, it adds the meals that appear in the family's slideshow of previous weeks (`js/slide-meals.js`, 53 meals). Each is placed only in the slots it was actually served in on the slides, and its tags come from the researched knowledge base (`js/dish-knowledge.js`, with sources) or from the name when that settles it. Dishes that depend on how your family makes them (Special Anda, Green Egg Monster, Pizza, Chicken Nuggets and so on) get only what is certain and are queued for the quick tag review. A meal you already have keeps its tags (or gets the researched ones if it had none) and only gains the slots it was served in; nothing is removed and a meal you delete later is not brought back.

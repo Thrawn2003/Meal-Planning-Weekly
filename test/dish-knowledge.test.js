@@ -72,7 +72,7 @@ test("the most specific entry wins when a name could match several", () => {
 });
 
 test("dishes that depend on the family are left alone, not guessed", () => {
-  ["Special Anda", "Green Egg Monster", "Simone's Chimichurri", "Pizza", "Burgers", "Hot Dogs", "Salad", "Kebab", "Chef's Choice", "School Lunch", "Date Night (Out)", "Chicken Nuggets"].forEach((n) => {
+  ["Special Anda", "Green Egg Monster", "Smokey Eggs", "Cereal & Milk", "Bagel & Cream Cheese", "Pizza", "Kebab", "Chef's Choice", "School Lunch", "Be Creative", "Date Night (Out)", "Chicken Nuggets"].forEach((n) => {
     assert.equal(DishKnowledge.lookup(n), null, n + " should not be researched");
   });
   assert.equal(DishKnowledge.lookup(null), null);
