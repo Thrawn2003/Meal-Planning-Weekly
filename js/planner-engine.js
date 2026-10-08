@@ -423,6 +423,29 @@ const PlannerEngine = (() => {
     const eligible = {};
     slotKeys.forEach((k) => (eligible[k] = meals.filter((m) => isEligible(m, k))));
 
+    // A meal only counts for the slots ticked on it. When a row has few of its own, meals ticked for the
+    // matching slot at the same time of day (Kids Breakfast <-> Parents Breakfast, and so on) can fill in.
+    const borrowable = {};
+    slotKeys.forEach((k) => {
+      const own = new Set(eligible[k]);
+      const seen = new Set();
+      borrowable[k] = [];
+      // A row with nothing of its own stays empty (Parents Dinner is usually filled by hand), and says so.
+      slotKeys.forEach((sib) => {
+        if (!own.size) return;
+        if (sib === k || mealTime(sib) !== mealTime(k)) return;
+        eligible[sib].forEach((m) => {
+          if (own.has(m) || seen.has(m)) return;
+          seen.add(m);
+          borrowable[k].push({ meal: m, from: sib });
+        });
+      });
+    });
+
+    const slotLabel = (k) => {
+      const found = slots.find((x) => x.key === k);
+      return (found && found.label) || k;
+    };
     const routineSlotList = opts.useRoutine === false ? [] : (opts.routineSlots || ROUTINE_SLOTS).filter((k) => slotKeys.includes(k));
     const H = buildHistory(meals, plans, plan.weekStart, weekStartDay, routineSlotList);
     const idx = indexMeals(meals);
@@ -524,6 +547,8 @@ const PlannerEngine = (() => {
     const learn = (slotKey, wd) => {
       const rows = H.routineCells.filter((c) => c.slotKey === slotKey && c.wd === wd && c.weeksAgo <= 12);
       if (new Set(rows.map((c) => c.weeksAgo)).size < 3) return null; // a routine needs 3 different weeks of evidence
+      // ...and a family that has only ever had one or two meals in a slot has a small library, not a routine.
+      if (new Set(H.routineCells.filter((c) => c.slotKey === slotKey).map((c) => c.norm)).size < 3) return null;
       const agg = new Map();
       let total = 0;
       rows.forEach((r) => {
@@ -575,30 +600,34 @@ const PlannerEngine = (() => {
       const skipped = [];
       let total = 0;
       order.forEach(({ d, slotKey }) => {
-        const all = eligible[slotKey];
-        if (!all.length) {
+        const own = eligible[slotKey];
+        const lent = borrowable[slotKey];
+        if (!own.length && !lent.length) {
           skipped.push({ d, slotKey });
           return;
         }
-        // Variety is a rule, not a preference: however strong the history, no meal fills more than its fair
-        // share of a row (once a week when there are 7+ meals to choose from).
-        const cap = Math.ceil(7 / all.length);
+        // Variety is a rule, not a preference: however strong the history, a meal repeats within a row only
+        // after every other choice, own meals first and then borrowed ones, has been used.
         const usedInRow = (m) => {
           let n = 0;
           for (let x = 0; x < 7; x++) if (ctx.assign.get(x + "|" + slotKey) === m) n++;
           return n;
         };
-        const open = all.filter((m) => usedInRow(m) < cap);
-        const cands = open.length ? open : all;
+        const cap = Math.ceil(7 / Math.max(1, own.length + lent.length));
+        let pool = own.filter((m) => usedInRow(m) < 1).map((m) => ({ meal: m }));
+        if (!pool.length) pool = lent.filter((l) => usedInRow(l.meal) < 1);
+        if (!pool.length) pool = own.filter((m) => usedInRow(m) < cap).map((m) => ({ meal: m }));
+        if (!pool.length) pool = lent.filter((l) => usedInRow(l.meal) < cap);
+        if (!pool.length) pool = own.concat(lent.map((l) => l.meal)).map((m) => ({ meal: m }));
         let best = null;
-        cands.forEach((m) => {
-          const scored = scoreCandidate(m, d, slotKey, ctx, S);
+        pool.forEach((c) => {
+          const scored = scoreCandidate(c.meal, d, slotKey, ctx, S);
           const val = scored.total + (jitter ? (rng() - 0.5) * jitter : 0);
-          if (!best || val > best.val) best = { val, meal: m, scored };
+          if (!best || val > best.val) best = { val, meal: c.meal, scored, from: c.from || null };
         });
         addToCtx(ctx, d, slotKey, best.meal);
         total += best.scored.total;
-        picks.push({ d, slotKey, meal: best.meal, scored: best.scored });
+        picks.push({ d, slotKey, meal: best.meal, scored: best.scored, from: best.from });
       });
       return { picks, skipped, total };
     }
@@ -616,7 +645,7 @@ const PlannerEngine = (() => {
       slotKey: p.slotKey,
       mealId: p.meal.id,
       text: p.meal.name,
-      reasons: explain(p.meal, p.scored),
+      reasons: (p.from ? ["From the " + slotLabel(p.from) + " meals (few are set for " + slotLabel(p.slotKey) + ")"] : []).concat(explain(p.meal, p.scored)),
       score: p.scored.total,
     }));
     const routineOut = routineAssignments.map((r) => ({
@@ -641,13 +670,18 @@ const PlannerEngine = (() => {
           (o[r.slotKey] = o[r.slotKey] || {})[r.text] = ((o[r.slotKey] || {})[r.text] || 0) + 1;
           return o;
         }, {}),
+        slotChoices: slotKeys.reduce((o, k) => {
+          const used = best.picks.filter((p) => p.slotKey === k);
+          o[k] = { own: eligible[k].length, borrowed: borrowable[k].length, borrowedUsed: used.filter((p) => p.from).length };
+          return o;
+        }, {}),
         historyCells: H.cells,
         historyWeeks: H.weeks,
       },
     };
   }
 
-  return { planWeek, BUILD: "2026-10-08a" };
+  return { planWeek, BUILD: "2026-10-08b" };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = PlannerEngine;

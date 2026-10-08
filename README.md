@@ -41,7 +41,7 @@ It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, n
 - **A balanced week**: quick meals on busy weeknights, big cooking and takeout on relaxed days, at most two takeout nights, no back-to-back heavy-cooking days, a mix of proteins and cuisines, and no unwanted repeats.
 - **Alternating, balanced breakfasts**: Indian and non-Indian breakfasts are alternated and spaced out day to day (including from the end of last week and around boxes you filled by hand), and each week keeps the family's usual mix, so "haven't had it in a while" can't tip it to all one kind. Weekly rituals (like a Saturday special) are exempt, and it only applies when both kinds are available for that slot. Cuisine and protein are recognized from the meal's name when a meal has no tag for them.
 
-**Parents Breakfast and Parents Lunch** repeat your usual for each weekday (what you had on that weekday in the same way across at least 3 of your recent hand-filled weeks, or the routine you saved with **📌 Save this week as my routine**). Auto-Populate tells you exactly what it repeated, and the **Repeat my usual** checkbox under *Parents' usual routine* turns this off so those rows vary like all the others. **Parents Dinner** boxes you've already filled are never touched, and count toward the week's variety.
+**Parents Breakfast and Parents Lunch** repeat your usual for each weekday (what you had on that weekday in the same way across at least 3 of your recent hand-filled weeks, or the routine you saved with **📌 Save this week as my routine**). A slot where you've only ever had one or two meals is treated as a small library, not a routine. Auto-Populate tells you exactly what it repeated, and the **Repeat my usual** checkbox under *Parents' usual routine* turns this off so those rows vary like all the others. **Parents Dinner** boxes you've already filled are never touched, and count toward the week's variety.
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 
@@ -85,3 +85,5 @@ The planner itself still recognizes cuisine and protein from a meal's name when 
 ## Meals
 
 The meal library starts empty — add your own real meals and their info on the Add New Meal page. Add, edit (delete + re-add), or clear meals anytime; clicking "Clear All Meals" is permanent.
+
+**Few meals ticked for a slot?** A meal only counts for the slots ticked on it. If a row has fewer than 7 of its own, Auto-Populate borrows meals ticked for the matching slot at the same time of day (Kids Breakfast ↔ Parents Breakfast, Namath/Parents Lunch, Kids/Parents Dinner) rather than repeating one meal, notes it under each borrowed box, and tells you which slots to tick on more meals. A row with nothing ticked stays empty.

@@ -791,17 +791,21 @@ document.getElementById("auto-populate-btn").addEventListener("click", () => {
       text: `${skipped} box${skipped === 1 ? "" : "es"} had no eligible meal. Add meals for those slots, or loosen your filters.`,
     });
   }
-  // Say plainly when a row has too few choices to vary (slot settings or filters), the usual cause of repeats.
-  const thin = SLOTS.map((s) => {
-    const fits = state.meals.filter((m) => mealFitsSlot(m, s.key));
-    const open = fits.filter((m) => mealPassesFilters(m, plan.weekStart));
-    return { label: s.label, fits: fits.length, open: open.length };
-  }).filter((t) => t.open < 5);
-  thin.forEach((t) => {
-    const hidden = t.fits - t.open;
-    lines.push({
-      text: `${t.label} ${t.open ? `only has ${t.open} meal${t.open === 1 ? "" : "s"}` : "has no meals"} to choose from${hidden > 0 ? ` (${hidden} more hidden by your filters)` : ""}, so ${t.open ? "it will repeat" : "it stays empty"}. Add ${t.open ? "more " : ""}meals for this slot in Add New Meal${hidden > 0 ? " or loosen the filters" : ""}.`,
-    });
+  // Say plainly when a row has few meals ticked for it: that, not the planner, is what limits the variety.
+  SLOTS.forEach((s) => {
+    const c = (result.stats.slotChoices || {})[s.key];
+    if (!c || c.own >= 7) return;
+    const hiddenByFilters = state.meals.filter((m) => mealFitsSlot(m, s.key) && !mealPassesFilters(m, plan.weekStart)).length;
+    const filterNote = hiddenByFilters ? ` (${hiddenByFilters} more ${hiddenByFilters === 1 ? "is" : "are"} hidden by your filters)` : "";
+    let text;
+    if (!c.own) {
+      text = `${s.label} has no meals ticked for it${filterNote}, so it stayed empty.`;
+    } else if (c.borrowedUsed) {
+      text = `${s.label} only has ${c.own} meal${c.own === 1 ? "" : "s"} ticked for it${filterNote}, so ${c.borrowedUsed} box${c.borrowedUsed === 1 ? " uses" : "es use"} a meal from the matching ${/breakfast/i.test(s.label) ? "breakfast" : /lunch/i.test(s.label) ? "lunch" : "dinner"} slot instead of repeating.`;
+    } else {
+      text = `${s.label} only has ${c.own} meal${c.own === 1 ? "" : "s"} ticked for it${filterNote}, so it repeats.`;
+    }
+    lines.push({ text: `${text} Tick ${s.label} on more meals (Add New Meal → edit a meal) for more variety.` });
   });
   if (filled && result.stats.historyCells < 20) {
     lines.push({ text: "Tip: suggestions get smarter as you save more weeks of your own meals.", small: true });
@@ -1436,7 +1440,7 @@ migrateTagsV4();
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-08a") {
+if (PlannerEngine.BUILD !== "2026-10-08b") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";

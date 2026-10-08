@@ -169,10 +169,10 @@ test("Indian/non-Indian alternation works inside the variety rule", () => {
 test("parents breakfast and lunch repeat the usual week, even when other meals are fresher", () => {
   const meals = [
     mk("Boiled Eggs", [PB]), mk("Special Anda", [PB], [INDIAN]), mk("Oatmeal", [PB]), mk("Brand New Toast", [PB]),
-    mk("Salad", [PL]), mk("Chef's Choice", [PL]), mk("Never Tried Wrap", [PL]),
+    mk("Salad", [PL]), mk("Chef's Choice", [PL]), mk("Never Tried Wrap", [PL]), mk("Soup", [PL]),
   ];
   const pbWeek = ["Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Boiled Eggs", "Oatmeal", "Special Anda"];
-  const plWeek = ["Chef's Choice", "Salad", "Salad", "Salad", "Salad", "Salad", "Chef's Choice"];
+  const plWeek = ["Chef's Choice", "Salad", "Salad", "Salad", "Salad", "Soup", "Chef's Choice"];
   const plans = {};
   ["2026-09-27", "2026-09-20", "2026-09-13"].forEach((w) => (plans[w] = week(w, { [PB]: pbWeek, [PL]: plWeek }, meals)));
   for (let i = 0; i < 4; i++) {
@@ -263,12 +263,20 @@ test("weeks Auto-Populate filled never teach the planner a habit (no self-reinfo
   assert.ok(new Set(names(res, PB)).size >= 4, "breakfast locked on: " + names(res, PB).join(","));
   assert.ok(!res.assignments.some((a) => a.routine), "an auto-filled week must not become the routine");
 
-  // The same weeks chosen by hand (no auto note) are a genuine habit and are respected.
-  const chosen = JSON.parse(JSON.stringify(plans));
-  Object.values(chosen).forEach((p) => Object.values(p.cells).forEach((c) => delete c.why));
+  // Weeks chosen by hand with real variety around a usual are a genuine habit and are respected.
+  const chosen = {};
+  ["2026-09-27", "2026-09-20", "2026-09-13"].forEach((w, i) => {
+    const cells = {};
+    for (let d = 0; d < 7; d++) {
+      const text = d === 6 ? ["Toast", "Cereal", "Oatmeal"][i] : "Eggs";
+      cells[isoPlus(w, d) + "_" + PB] = { mealId: "id-" + text, text };
+    }
+    chosen[w] = { weekStart: w, cells };
+  });
   const habit = run(meals, chosen, plan());
-  assert.deepEqual(names(habit, PB), Array(7).fill("Eggs"));
+  assert.deepEqual(names(habit, PB).slice(0, 6), Array(6).fill("Eggs"));
 });
+
 
 test("auto-filled weeks still count for how recently a meal was planned", () => {
   const meals = dinners(10);
@@ -385,13 +393,39 @@ test("for any library and history: every box is filled and no meal takes over a 
 test("turning the routine off makes Parents Breakfast and Lunch vary like every other row", () => {
   const meals = ["Avocado Toast", "Eggs", "Oatmeal", "Cereal", "Bagel", "Yogurt", "Pancakes", "Smoothie"].map((n) => mk(n, [PB]));
   const plans = {};
-  ["2026-09-27", "2026-09-20", "2026-09-13", "2026-09-06"].forEach((w) => (plans[w] = week(w, { [PB]: Array(7).fill("Avocado Toast") }, meals)));
+  ["2026-09-27", "2026-09-20", "2026-09-13", "2026-09-06"].forEach((w, i) => {
+    const row = Array(7).fill("Avocado Toast");
+    row[0] = ["Eggs", "Oatmeal", "Cereal", "Bagel"][i];
+    plans[w] = week(w, { [PB]: row }, meals);
+  });
   const usual = run(meals, plans, plan());
-  assert.deepEqual(names(usual, PB), Array(7).fill("Avocado Toast"));
-  assert.deepEqual(usual.stats.routineMeals, { [PB]: { "Avocado Toast": 7 } });
+  assert.deepEqual(names(usual, PB).slice(1), Array(6).fill("Avocado Toast"));
+  assert.deepEqual(usual.stats.routineMeals, { [PB]: { "Avocado Toast": 6 } });
   const varied = run(meals, plans, plan(), { useRoutine: false });
   assert.equal(new Set(names(varied, PB)).size, 7, names(varied, PB).join(","));
   assert.equal(varied.stats.routine, 0);
+});
+
+test("a slot that has only ever had one meal is a small library, not a routine", () => {
+  const meals = ["Avocado Toast", "Eggs", "Oatmeal", "Cereal", "Bagel", "Yogurt", "Pancakes"].map((n) => mk(n, [PB]));
+  const plans = {};
+  ["2026-09-27", "2026-09-20", "2026-09-13", "2026-09-06"].forEach((w) => (plans[w] = week(w, { [PB]: Array(7).fill("Avocado Toast") }, meals)));
+  const res = run(meals, plans, plan());
+  assert.equal(res.stats.routine, 0);
+  assert.equal(new Set(names(res, PB)).size, 7);
+});
+
+test("a row with only a few meals of its own borrows from the same time of day instead of repeating", () => {
+  const meals = [mk("Avocado Toast", [PB]), ...["Pancakes", "Oatmeal", "Cereal", "Bagel", "Yogurt", "Waffles"].map((n) => mk(n, [KB]))];
+  const res = run(meals, {}, plan());
+  const row = names(res, PB);
+  assert.equal(row.length, 7);
+  assert.equal(new Set(row).size, 7, row.join(","));
+  assert.equal(res.stats.slotChoices[PB].own, 1);
+  assert.equal(res.stats.slotChoices[PB].borrowedUsed, 6);
+  assert.ok(res.assignments.filter((a) => a.slotKey === PB && a.text !== "Avocado Toast").every((a) => /^From the/.test(a.reasons[0])));
+  // a row with nothing at all stays empty rather than copying another row
+  assert.equal(names(res, PD).length, 0);
 });
 
 test("a routine needs three different weeks of evidence", () => {
