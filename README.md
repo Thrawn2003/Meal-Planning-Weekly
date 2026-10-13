@@ -45,7 +45,7 @@ It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, n
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 
-To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js test/dish-knowledge.test.js test/slide-meals.test.js` (Node 18+, no dependencies).
+To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js test/dish-knowledge.test.js test/slide-meals.test.js test/meal-search.test.js` (Node 18+, no dependencies).
 
 ## Saving as a PDF
 
@@ -93,4 +93,13 @@ The meal library starts empty — add your own real meals and their info on the 
 The first time the site loads, it adds the meals that appear in the family's slideshow of previous weeks (`js/slide-meals.js`, 53 meals). Each is placed only in the slots it was actually served in on the slides, and its tags come from the researched knowledge base (`js/dish-knowledge.js`, with sources) or from the name when that settles it. Dishes that depend on how your family makes them (Special Anda, Green Egg Monster, Pizza, Chicken Nuggets and so on) get only what is certain and are queued for the quick tag review. A meal you already have keeps its tags (or gets the researched ones if it had none) and only gains the slots it was served in; nothing is removed and a meal you delete later is not brought back.
 
 The four dated weeks of the slideshow (Sept 7 through Oct 3) are also saved as your past weeks, day by day exactly as laid out in its tables, so Auto-Populate can learn your usual Parents Breakfast (Boiled Eggs) and Parents Lunch (Salad). Boxes you filled yourself are never overwritten; boxes Auto-Populate had guessed are replaced by what was really eaten. The undated first slide is not included. How the family said a few dishes are made (store-bought Chicken Nuggets, Samosa and Kebab; homemade Pizza; quick Green Egg Monster) is applied on top of the research. "Simones" on the slides is takeout from the Simone's restaurant and "Chimichurri Chicken" is its own dish.
+
+## Planning a week
+
+- **Type to fill a box.** Matching meals appear as you type (a prefix, any word, or a few letters from inside a name); arrow keys move through them, Enter or Tab takes the highlighted one, Esc closes the list, and anything you type that is not a library meal is kept as written. The small arrow in the corner of each box browses the whole list instead.
+- **Dinner boxes only offer dinners.** Kids Dinner and Parents Dinner list and suggest only meals served at dinner (the ones ticked for a dinner slot, or ticked for nothing). Other boxes offer every meal, with the ones for that box first.
+- **The grid fills the window.** While you plan a week, the table uses the full width and height of the window with no page scrolling (small windows scroll instead).
+- **Ctrl+S (or Save to Library) saves the week's meals to your meal library.** Meals you typed that are not in the library are added in the row you typed them in, with the obvious tags and a place in the tag review; boxes link to their meals, and a meal used in a row it was not ticked for gains that row. A box listing several ("Kebab / Samosa") saves each one. Nothing is removed or retagged.
+- **Special days.** Click "Mark special" under any day to give it a tag you type (a birthday, a trip). The day is shaded in a different color and the tag shows on the printed sheet.
+- **The PDF fills US Letter, landscape,** with large bold text, a color-coded header and rows, and special days highlighted.
 

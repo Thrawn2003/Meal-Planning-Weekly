@@ -265,6 +265,7 @@ function showView(name) {
   if (name === "add-meal") renderAddMealView();
   if (name === "pdfs") renderPdfHistoryView();
   if (name === "plan") renderPlanView();
+  syncFitMode();
 }
 
 document.querySelectorAll(".nav-link").forEach((btn) => {
@@ -281,6 +282,12 @@ const yearCalendarEl = document.getElementById("year-calendar");
 const calYearLabelEl = document.getElementById("cal-year-label");
 const calSelectionStatusEl = document.getElementById("cal-selection-status");
 
+// While the week table is showing, the page is exactly one screen: the grid fills the window.
+function syncFitMode() {
+  const planning = !views.plan.classList.contains("hidden") && !weekTableWrapEl.classList.contains("hidden");
+  document.body.classList.toggle("plan-fit", planning);
+}
+
 function renderPlanView() {
   if (state.currentWeekKey && state.plans[state.currentWeekKey]) {
     calendarPickerEl.classList.add("hidden");
@@ -291,6 +298,7 @@ function renderPlanView() {
     weekTableWrapEl.classList.add("hidden");
     renderYearCalendar();
   }
+  syncFitMode();
 }
 
 function renderYearCalendar() {
@@ -515,16 +523,17 @@ function weekDates(plan) {
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
 }
 
-/* ---------------------- Meal picker (shared floating panel) ----------------------
-   A single panel reused for every cell, positioned with the viewport (not an
-   ancestor's scroll box), so the full option list is always fully on-screen
-   and scrollable in place — no matter where the cell is on the page. */
+/* ---------------------- Meal panel (shared floating list) ----------------------
+   One panel reused for every box. It is used two ways: as the suggestions that appear while you type in a
+   box (the main way), and as the full "browse" list behind the small arrow button. It is positioned with
+   the viewport, not an ancestor's scroll box, so it is always fully on-screen and scrollable in place. */
 
 const mealPickerPanelEl = document.createElement("div");
 mealPickerPanelEl.className = "meal-picker-panel hidden";
+mealPickerPanelEl.setAttribute("role", "listbox");
 document.body.appendChild(mealPickerPanelEl);
 
-let activeMealPicker = null; // { anchorEl }
+let activeMealPicker = null; // { anchorEl, items, index, onPick }
 
 function closeMealPicker() {
   mealPickerPanelEl.classList.add("hidden");
@@ -553,47 +562,106 @@ function positionMealPicker(anchorEl) {
   }
 }
 
-function openMealPicker({ anchorEl, weekStart, onPick }) {
-  // Show every meal here regardless of which slots it's assigned to - the
-  // slot checkboxes on Add New Meal are only used to steer Auto-Populate,
-  // not to hide meals from manual picking.
-  const candidates = state.meals
-    .filter((m) => mealPassesFilters(m, weekStart))
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+function setPanelIndex(index) {
+  if (!activeMealPicker) return;
+  const buttons = mealPickerPanelEl.querySelectorAll(".meal-picker-item");
+  if (!buttons.length) return;
+  const next = (index + buttons.length) % buttons.length;
+  activeMealPicker.index = next;
+  buttons.forEach((btn, i) => {
+    btn.classList.toggle("active", i === next);
+    btn.setAttribute("aria-selected", i === next ? "true" : "false");
+  });
+  buttons[next].scrollIntoView({ block: "nearest" });
+}
 
+// Appends `text` with the part that matches `query` in bold.
+function appendHighlighted(el, text, query) {
+  const q = String(query || "").trim();
+  const at = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (at < 0) {
+    el.textContent = text;
+    return;
+  }
+  el.appendChild(document.createTextNode(text.slice(0, at)));
+  const strong = document.createElement("strong");
+  strong.textContent = text.slice(at, at + q.length);
+  el.appendChild(strong);
+  el.appendChild(document.createTextNode(text.slice(at + q.length)));
+}
+
+function showMealPanel({ anchorEl, openerEl, items, query, onPick, heading, emptyText, activeFirst }) {
   mealPickerPanelEl.innerHTML = "";
 
-  if (candidates.length === 0) {
+  if (heading) {
+    const head = document.createElement("div");
+    head.className = "meal-picker-heading";
+    head.textContent = heading;
+    mealPickerPanelEl.appendChild(head);
+  }
+
+  if (items.length === 0) {
     const empty = document.createElement("div");
     empty.className = "meal-picker-empty";
-    empty.textContent = "Nothing to show here yet — check your filters, or add a meal on the Add New Meal tab. 🙂";
+    empty.textContent = emptyText;
     mealPickerPanelEl.appendChild(empty);
   } else {
-    candidates.forEach((m) => {
+    items.forEach((m, i) => {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "meal-picker-item";
-      item.textContent = m.name;
-      // mousedown fires before the calling button's own click/blur, so the
-      // selection registers before anything else can close the panel first.
+      item.setAttribute("role", "option");
+      appendHighlighted(item, m.name, query);
+      // mousedown fires before the box's own blur, so the choice registers before anything closes the panel.
       item.addEventListener("mousedown", (e) => {
         e.preventDefault();
         onPick(m);
+      });
+      item.addEventListener("mousemove", () => {
+        if (activeMealPicker && activeMealPicker.index !== i) setPanelIndex(i);
       });
       mealPickerPanelEl.appendChild(item);
     });
   }
 
+  activeMealPicker = { anchorEl, openerEl: openerEl || null, items, index: -1, onPick };
   positionMealPicker(anchorEl);
   mealPickerPanelEl.classList.remove("hidden");
   mealPickerPanelEl.scrollTop = 0;
-  activeMealPicker = { anchorEl };
+  if (activeFirst && items.length) setPanelIndex(0);
+}
+
+// The full list behind the small arrow button. Dinner boxes only list dinner meals.
+function openMealPicker({ anchorEl, openerEl, weekStart, slotKey, onPick }) {
+  const pool = state.meals.filter((m) => mealPassesFilters(m, weekStart));
+  const items = MealSearch.optionsFor(pool, slotKey);
+  const dinner = MealSearch.isDinnerSlot(slotKey);
+  showMealPanel({
+    anchorEl,
+    openerEl,
+    items,
+    query: "",
+    onPick,
+    heading: dinner ? "Dinner meals" : "All meals (the ones for this box come first)",
+    emptyText: dinner
+      ? "No dinner meals yet. Add one on the Add New Meal tab, or check your filters. 🙂"
+      : "Nothing to show here yet. Check your filters, or add a meal on the Add New Meal tab. 🙂",
+  });
+}
+
+// Suggestions while typing: best matches first, dinner boxes only ever suggest dinner meals.
+function openMealSuggestions({ anchorEl, slotKey, text, onPick }) {
+  const query = String(text || "").trim();
+  if (!query) return closeMealPicker();
+  const pool = state.meals.filter(mealPassesTagFilters);
+  const items = MealSearch.suggest(pool, query, slotKey, 8);
+  if (!items.length) return closeMealPicker();
+  showMealPanel({ anchorEl, items, query, onPick, activeFirst: true });
 }
 
 document.addEventListener("click", (e) => {
   if (!activeMealPicker) return;
-  if (mealPickerPanelEl.contains(e.target) || e.target === activeMealPicker.anchorEl) return;
+  if (mealPickerPanelEl.contains(e.target) || e.target === activeMealPicker.anchorEl || e.target === activeMealPicker.openerEl) return;
   closeMealPicker();
 });
 
@@ -604,10 +672,8 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener(
   "scroll",
   (e) => {
-    // Keep the panel correctly anchored through any scroll - including the
-    // browser's own focus-scroll-into-view when the pick button is opened
-    // near the edge of the horizontally-scrollable table. Closing here
-    // instead would make the panel vanish before it's ever seen.
+    // Keep the panel anchored through any scroll, including the browser's own focus-scroll when a
+    // box near the edge of the table is opened. Closing here would make it vanish before it is seen.
     if (!activeMealPicker) return;
     if (mealPickerPanelEl.contains(e.target)) return;
     positionMealPicker(activeMealPicker.anchorEl);
@@ -617,6 +683,19 @@ window.addEventListener(
 window.addEventListener("resize", () => {
   if (activeMealPicker) positionMealPicker(activeMealPicker.anchorEl);
 });
+
+/* ---------------------- Special days ---------------------- */
+
+function specialLabel(plan, dateISO) {
+  return plan.special && Object.prototype.hasOwnProperty.call(plan.special, dateISO) ? plan.special[dateISO] : null;
+}
+
+function setSpecial(plan, dateISO, label) {
+  plan.special = plan.special || {};
+  if (label === null) delete plan.special[dateISO];
+  else plan.special[dateISO] = label;
+  persistPlans();
+}
 
 function renderWeekTable() {
   const plan = currentPlan();
@@ -631,7 +710,10 @@ function renderWeekTable() {
   // Header row
   weekTableHeadRowEl.innerHTML = "<th>Meal</th>";
   dates.forEach((d) => {
+    const dateISO = toISODate(d);
+    const special = specialLabel(plan, dateISO);
     const th = document.createElement("th");
+    th.className = special !== null ? "special-day-head" : "";
     const nameSpan = document.createElement("span");
     nameSpan.className = "day-name";
     nameSpan.textContent = DOW_NAMES[d.getDay()];
@@ -640,6 +722,59 @@ function renderWeekTable() {
     dateSpan.textContent = formatPretty(d);
     th.appendChild(nameSpan);
     th.appendChild(dateSpan);
+
+    if (special === null) {
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "special-add-btn";
+      add.textContent = "☆ Mark special";
+      add.title = "Mark this day as a special day, like a birthday or a trip";
+      add.addEventListener("click", () => {
+        setSpecial(plan, dateISO, "");
+        renderWeekTable();
+        const input = weekTableHeadRowEl.querySelector(`input[data-date="${dateISO}"]`);
+        if (input) input.focus();
+      });
+      th.appendChild(add);
+    } else {
+      const tag = document.createElement("div");
+      tag.className = "special-tag";
+      const star = document.createElement("span");
+      star.textContent = "★";
+      star.setAttribute("aria-hidden", "true");
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = special;
+      input.maxLength = 40;
+      input.placeholder = "What's special?";
+      input.dataset.date = dateISO;
+      input.setAttribute("aria-label", `What is special about ${DOW_NAMES[d.getDay()]}?`);
+      input.addEventListener("input", () => setSpecial(plan, dateISO, input.value));
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") input.blur();
+      });
+      input.title = special;
+      input.addEventListener("blur", () => {
+        input.scrollLeft = 0;
+        input.title = input.value;
+        if (!input.value.trim()) {
+          input.value = "Special day";
+          setSpecial(plan, dateISO, "Special day");
+        }
+      });
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "special-clear-btn";
+      clear.textContent = "✕";
+      clear.title = "Unmark this day";
+      clear.setAttribute("aria-label", "Unmark this day as special");
+      clear.addEventListener("click", () => {
+        setSpecial(plan, dateISO, null);
+        renderWeekTable();
+      });
+      tag.append(star, input, clear);
+      th.appendChild(tag);
+    }
     weekTableHeadRowEl.appendChild(th);
   });
 
@@ -649,11 +784,11 @@ function renderWeekTable() {
     const tr = document.createElement("tr");
     const th = document.createElement("th");
     th.textContent = slot.label;
-    // How many saved meals Auto-Populate can use for this row: the cause of most "it keeps repeating" problems.
+    // How many saved meals this row can use: the cause of most "it keeps repeating" problems.
     const usable = state.meals.filter((m) => mealFitsSlot(m, slot.key) && mealPassesFilters(m, plan.weekStart)).length;
     const countEl = document.createElement("span");
     countEl.className = "row-meal-count" + (usable < 7 ? " row-meal-count-low" : "");
-    countEl.textContent = usable === 0 ? "no meals ticked for this row" : `${usable} meal${usable === 1 ? "" : "s"} for this row`;
+    countEl.textContent = usable === 0 ? "no meals ticked" : `${usable} meal${usable === 1 ? "" : "s"}`;
     th.appendChild(countEl);
     tr.appendChild(th);
 
@@ -663,18 +798,24 @@ function renderWeekTable() {
       const cellData = plan.cells[key] || { mealId: null, text: "" };
 
       const td = document.createElement("td");
+      if (specialLabel(plan, dateISO) !== null) td.className = "special-day";
       const wrap = document.createElement("div");
       wrap.className = "cell-editor";
 
       const textarea = document.createElement("textarea");
-      textarea.placeholder = "Type a meal, or pick one below";
+      textarea.placeholder = "Type a meal…";
       textarea.value = cellData.text || "";
       textarea.rows = 2;
+      textarea.setAttribute("aria-label", `${slot.label}, ${DOW_NAMES[d.getDay()]}`);
+      textarea.setAttribute("autocomplete", "off");
+      textarea.setAttribute("spellcheck", "false");
 
-      const pickBtn = document.createElement("button");
-      pickBtn.type = "button";
-      pickBtn.className = "cell-pick-btn";
-      pickBtn.textContent = "Choose a meal ▾";
+      const browseBtn = document.createElement("button");
+      browseBtn.type = "button";
+      browseBtn.className = "cell-browse-btn";
+      browseBtn.textContent = "▾";
+      browseBtn.title = MealSearch.isDinnerSlot(slot.key) ? "Browse dinner meals" : "Browse all meals";
+      browseBtn.setAttribute("aria-label", "Browse meals for this box");
 
       const reasonEl = document.createElement("div");
       reasonEl.className = "cell-reason";
@@ -693,17 +834,46 @@ function renderWeekTable() {
         closeMealPicker();
       };
 
-      pickBtn.addEventListener("click", () => {
-        openMealPicker({ anchorEl: pickBtn, weekStart: plan.weekStart, onPick: pick });
+      browseBtn.addEventListener("click", () => {
+        openMealPicker({ anchorEl: textarea, openerEl: browseBtn, weekStart: plan.weekStart, slotKey: slot.key, onPick: pick });
       });
 
       textarea.addEventListener("input", () => {
         setCell(plan, key, { mealId: null, text: textarea.value });
         reasonEl.classList.add("hidden");
+        openMealSuggestions({ anchorEl: textarea, slotKey: slot.key, text: textarea.value, onPick: pick });
+      });
+
+      textarea.addEventListener("keydown", (e) => {
+        const open = activeMealPicker && activeMealPicker.anchorEl === textarea && !mealPickerPanelEl.classList.contains("hidden");
+        if (open && e.key === "ArrowDown") {
+          e.preventDefault();
+          setPanelIndex(activeMealPicker.index + 1);
+        } else if (open && e.key === "ArrowUp") {
+          e.preventDefault();
+          setPanelIndex(activeMealPicker.index - 1);
+        } else if (open && activeMealPicker.index >= 0 && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+          // Enter or Tab takes the highlighted suggestion, like filling a spreadsheet cell.
+          const meal = activeMealPicker.items[activeMealPicker.index];
+          if (e.key === "Enter") e.preventDefault();
+          if (meal) pick(meal);
+        } else if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          textarea.blur();
+        }
+      });
+
+      // Typing a name that is exactly a library meal links the box to it, so recency and tags still apply.
+      textarea.addEventListener("blur", () => {
+        const text = textarea.value.trim();
+        const current = plan.cells[key];
+        if (!text || (current && current.mealId)) return;
+        const hit = state.meals.find((m) => m.name.trim().toLowerCase() === text.toLowerCase());
+        if (hit) setCell(plan, key, { mealId: hit.id, text: hit.name });
       });
 
       wrap.appendChild(textarea);
-      wrap.appendChild(pickBtn);
+      wrap.appendChild(browseBtn);
       wrap.appendChild(reasonEl);
       td.appendChild(wrap);
       tr.appendChild(td);
@@ -726,6 +896,48 @@ function markMealUsed(meal, weekStartISO) {
   persistMeals();
 }
 
+/* ---------------------- Save to library (Ctrl+S) ---------------------- */
+
+// Puts every meal typed into this week into the meal library, and links the boxes to them.
+function saveWeekToLibrary() {
+  const plan = currentPlan();
+  if (!plan) return;
+  const out = MealSearch.collectNewMeals(plan, state.meals, SLOTS, {
+    tagsFor: (name) => DishKnowledge.applyToTags(name, TagTools.withInferredTags({ name, tags: [] }).tags),
+    makeId: (i) => `meal_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+  });
+  persistMeals();
+  persistPlans();
+
+  const lines = [];
+  if (out.created.length) {
+    const names = out.created.map((m) => m.name);
+    lines.push({
+      text: `💾 Saved ${names.length} new meal${names.length === 1 ? "" : "s"} to your library: ${names.slice(0, 6).join(", ")}${names.length > 6 ? ` and ${names.length - 6} more` : ""}.`,
+    });
+    lines.push({ text: "Each one is ticked for the row you typed it in. Tags can be checked later on Add New Meal.", small: true });
+  } else {
+    lines.push({ text: "💾 Everything in this week is already in your meal library. Nothing new to save." });
+  }
+  const moved = out.widened.filter((m) => !out.created.includes(m));
+  if (moved.length) {
+    lines.push({ text: `${moved.length} meal${moved.length === 1 ? " was" : "s were"} also ticked for the row you used ${moved.length === 1 ? "it" : "them"} in.`, small: true });
+  }
+  showAutoPopStatus(lines);
+  renderWeekTable();
+}
+
+document.getElementById("save-library-btn").addEventListener("click", saveWeekToLibrary);
+
+document.addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== "s") return;
+  const planning = !views.plan.classList.contains("hidden") && !weekTableWrapEl.classList.contains("hidden");
+  if (!planning) return;
+  e.preventDefault(); // not the browser's "save page" dialog
+  closeMealPicker();
+  saveWeekToLibrary();
+});
+
 document.getElementById("clear-week-btn").addEventListener("click", () => {
   const plan = currentPlan();
   if (!plan) return;
@@ -744,8 +956,11 @@ const autoPopStatusTextEl = document.getElementById("autopop-status-text");
 const autoRollCounts = new Map();
 const autoLastPicks = new Map();
 
+let autoPopStatusTimer = null;
+
 function hideAutoPopStatus() {
   autoPopStatusEl.classList.add("hidden");
+  clearTimeout(autoPopStatusTimer);
 }
 
 function showAutoPopStatus(lines) {
@@ -757,6 +972,9 @@ function showAutoPopStatus(lines) {
     autoPopStatusTextEl.appendChild(p);
   });
   autoPopStatusEl.classList.remove("hidden");
+  // Short confirmations (like "Saved") clear themselves; the long Auto-Populate explanation stays until closed.
+  clearTimeout(autoPopStatusTimer);
+  if (lines.length <= 3) autoPopStatusTimer = setTimeout(hideAutoPopStatus, 7000);
 }
 
 document.getElementById("autopop-status-close").addEventListener("click", hideAutoPopStatus);
@@ -927,9 +1145,13 @@ const printAreaEl = document.getElementById("print-area");
 
 function buildPrintTable(plan) {
   const dates = weekDates(plan);
-  let html = `<h1>${escapeHTML(plan.title)}</h1><table class="print-table"><thead><tr><th>Meal</th>`;
+  const special = (d) => specialLabel(plan, toISODate(d));
+  let html = `<div class="print-sheet"><h1>${escapeHTML(plan.title)}</h1><table class="print-table"><thead><tr><th class="corner">Meal</th>`;
   dates.forEach((d) => {
-    html += `<th>${DOW_NAMES[d.getDay()]}<br>${formatPretty(d)}</th>`;
+    const label = special(d);
+    html += `<th class="${label !== null ? "special" : ""}"><span class="pd-name">${DOW_NAMES[d.getDay()]}</span><span class="pd-date">${formatPretty(d)}</span>`;
+    if (label !== null) html += `<span class="pd-tag">★ ${escapeHTML(label || "Special day")}</span>`;
+    html += "</th>";
   });
   html += "</tr></thead><tbody>";
 
@@ -938,12 +1160,12 @@ function buildPrintTable(plan) {
     dates.forEach((d) => {
       const dateISO = toISODate(d);
       const cellData = plan.cells[cellKey(dateISO, slot.key)] || { text: "" };
-      html += `<td>${escapeHTML(cellData.text || "")}</td>`;
+      html += `<td class="${special(d) !== null ? "special" : ""}"><span>${escapeHTML(cellData.text || "")}</span></td>`;
     });
     html += "</tr>";
   });
 
-  html += "</tbody></table>";
+  html += "</tbody></table></div>";
   return html;
 }
 
@@ -1477,7 +1699,7 @@ importSlideMealsV2();
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-08e") {
+if (PlannerEngine.BUILD !== "2026-10-12a") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";
