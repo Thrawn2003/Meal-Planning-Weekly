@@ -45,7 +45,7 @@ It's a free, offline, rule-based planner (`js/planner-engine.js`) — **no AI, n
 
 It tries many arrangements and keeps the best one. Click Auto-Populate again after **Clear Week** and it steers away from its last suggestion, so you get a different option. Suggestions get smarter as you save more weeks.
 
-To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js test/dish-knowledge.test.js test/slide-meals.test.js test/meal-search.test.js` (Node 18+, no dependencies).
+To run the tests: `node --test test/planner-engine.test.js test/tag-tools.test.js test/dish-knowledge.test.js test/slide-meals.test.js test/meal-search.test.js test/backup.test.js` (Node 18+, no dependencies).
 
 ## Saving as a PDF
 
@@ -103,4 +103,8 @@ The four dated weeks of the slideshow (Sept 7 through Oct 3) are also saved as y
 - **All PDFs.** Every saved or printed week is listed. **View** shows it exactly as it prints, **Print / Save as PDF** opens the print dialog, and **Open in Planner** brings it back to edit.
 - **Special days.** Click "Mark special" under any day to give it a tag you type (a birthday, a trip). The day is shaded in a different color and the tag shows on the printed sheet.
 - **The PDF fills US Letter, landscape,** with large bold text, a color-coded header and rows, and special days highlighted.
+
+## Your planner file (if your browser forgets)
+
+The site keeps your weeks and meals inside the browser. Some browsers clear that when a tab or the browser closes (a "clear cookies and site data on exit" setting), which makes a saved week look like it vanished. To protect against that, **Ctrl+S also writes a planner file** (`meal-planner.json`) to your computer in Chrome or Edge: the first time it asks where to keep it (your Documents folder is a good place), after that it just updates it. If a visit starts with nothing saved, a welcome banner offers **Open my planner file**, and one click brings back the latest saved version: every week, your meal library, saved PDFs and settings. The **All PDFs** tab has the same controls, plus **Download a backup** and **Restore from a backup** for browsers that can't keep a file for you. You can also stop the clearing itself: in Chrome or Edge open Settings, then Cookies and site data, and turn off clearing on exit or add `thrawn2003.github.io` to the sites that may always save data.
 

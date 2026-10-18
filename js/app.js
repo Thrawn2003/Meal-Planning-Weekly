@@ -34,6 +34,7 @@ const STORAGE_KEYS = {
   useRoutine: "mpw_use_routine",
   slideMealsV1: "mpw_slide_meals_v1",
   slideMealsV2: "mpw_slide_meals_v2",
+  visited: "mpw_visited",
 };
 
 const DEFAULT_TAGS = TagTools.ALL;
@@ -978,6 +979,17 @@ function saveWeek() {
   }
   showAutoPopStatus(lines);
   renderWeekTable();
+
+  // Also keep a copy as a file on this computer, which survives browsers that clear a site's data when they close.
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  backupToFile().then((r) => {
+    if (r.status === "saved") lines.splice(1, 0, { text: `Also saved to your planner file (${r.name}), so it survives even if this browser clears its data.`, small: true });
+    else if (r.status === "cancelled") lines.push({ text: "No planner file chosen, so this week is only kept inside this browser.", small: true });
+    else if (r.status === "unsupported") lines.push({ text: "This browser can't keep a file for you. On the All PDFs tab you can download a backup instead.", small: true });
+    else if (r.status === "error") lines.push({ text: "Couldn't write your planner file this time. It is still saved in this browser.", small: true });
+    else return;
+    showAutoPopStatus(lines);
+  });
 }
 
 document.getElementById("save-week-btn").addEventListener("click", saveWeek);
@@ -1231,6 +1243,7 @@ function escapeHTML(str) {
 function saveAndPrintPlan(plan) {
   printAreaEl.innerHTML = buildPrintTable(plan);
   recordSavedWeek(plan);
+  backupToFile({ onlyIfLinked: true });
   window.print();
 }
 
@@ -1310,6 +1323,7 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener("resize", fitPdfPreview);
 
 function renderPdfHistoryView() {
+  renderPlannerFilePanel();
   pdfHistoryListEl.innerHTML = "";
 
   if (state.pdfHistory.length === 0) {
@@ -1369,6 +1383,197 @@ function renderPdfHistoryView() {
     card.appendChild(actions);
     pdfHistoryListEl.appendChild(card);
   });
+}
+
+/* =====================================================================
+   PLANNER FILE: a copy on this computer that survives browsers clearing site data
+   ===================================================================== */
+
+const FILE_KEYS = Object.values(STORAGE_KEYS);
+const FILE_PICKER_TYPES = [{ description: "Meal planner data", accept: { "application/json": [".json"] } }];
+const fileApiOk = typeof window.showSaveFilePicker === "function" && typeof window.showOpenFilePicker === "function";
+const plannerFile = { handle: null, name: "", at: null, declined: false };
+
+function openHandleDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("mpw_files", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("handles");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function rememberHandle(handle) {
+  try {
+    const db = await openHandleDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction("handles", "readwrite");
+      tx.objectStore("handles").put(handle, "planner");
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    /* remembering the file is a convenience; saving still works without it */
+  }
+}
+
+async function recallHandle() {
+  try {
+    const db = await openHandleDb();
+    return await new Promise((resolve, reject) => {
+      const req = db.transaction("handles").objectStore("handles").get("planner");
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function writePlannerFile(handle) {
+  const writable = await handle.createWritable();
+  await writable.write(JSON.stringify(Backup.snapshot(localStorage, FILE_KEYS), null, 1));
+  await writable.close();
+  plannerFile.handle = handle;
+  plannerFile.name = handle.name;
+  plannerFile.at = new Date();
+}
+
+// Writes the planner file. The first time it asks where to keep it; after that it just updates it.
+// status: saved | cancelled | unsupported | error | skipped
+async function backupToFile({ onlyIfLinked = false } = {}) {
+  if (!fileApiOk) return { status: "unsupported" };
+  try {
+    let handle = plannerFile.handle || (await recallHandle());
+    if (handle) {
+      let perm = await handle.queryPermission({ mode: "readwrite" });
+      if (perm !== "granted" && !onlyIfLinked) perm = await handle.requestPermission({ mode: "readwrite" });
+      if (perm !== "granted") handle = null;
+    }
+    if (!handle) {
+      if (onlyIfLinked || plannerFile.declined) return { status: "skipped" };
+      handle = await window.showSaveFilePicker({ suggestedName: "meal-planner.json", types: FILE_PICKER_TYPES });
+      await rememberHandle(handle);
+    }
+    await writePlannerFile(handle);
+    renderPlannerFilePanel();
+    return { status: "saved", name: handle.name };
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      plannerFile.declined = true; // do not ask again on every Ctrl+S this visit
+      return { status: "cancelled" };
+    }
+    console.warn("Planner file", e);
+    return { status: "error" };
+  }
+}
+
+// Replaces what this browser holds with the contents of a planner file, then reloads to show it.
+function restoreFromText(text) {
+  const obj = Backup.parse(text);
+  const sum = Backup.summarize(obj);
+  const when = sum.savedAt ? new Date(sum.savedAt).toLocaleString() : "an unknown time";
+  const ok = confirm(
+    `Bring back the planner saved ${when}?\n\nIt has ${sum.weeks} planned week${sum.weeks === 1 ? "" : "s"} and ${sum.meals} meals. This replaces what is in this browser now.`
+  );
+  if (!ok) return false;
+  Backup.restore(obj, localStorage, FILE_KEYS);
+  location.reload();
+  return true;
+}
+
+async function restoreFromPickedFile() {
+  try {
+    const [handle] = await window.showOpenFilePicker({ types: FILE_PICKER_TYPES, multiple: false });
+    if (!handle) return;
+    const text = await (await handle.getFile()).text();
+    if (restoreFromText(text)) await rememberHandle(handle);
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    alert(e && e.message ? e.message : "That file couldn't be opened.");
+  }
+}
+
+function downloadBackup() {
+  const blob = new Blob([JSON.stringify(Backup.snapshot(localStorage, FILE_KEYS), null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `meal-planner-${toISODate(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// If a planner file was chosen on an earlier visit, remember that it is linked.
+if (fileApiOk) {
+  recallHandle().then((h) => {
+    if (!h || plannerFile.handle) return;
+    plannerFile.handle = h;
+    plannerFile.name = h.name;
+    renderPlannerFilePanel();
+  });
+}
+
+const plannerFileStatusEl = document.getElementById("planner-file-status");
+const restoreInputEl = document.getElementById("restore-input");
+
+function renderPlannerFilePanel() {
+  if (!plannerFileStatusEl) return;
+  if (!fileApiOk) {
+    plannerFileStatusEl.textContent = "This browser can't keep a file for you automatically. Download a backup now and then, and restore it here if your weeks ever go missing.";
+  } else if (plannerFile.at) {
+    plannerFileStatusEl.textContent = `✓ ${plannerFile.name} was updated at ${plannerFile.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Ctrl+S keeps it up to date.`;
+  } else if (plannerFile.handle) {
+    plannerFileStatusEl.textContent = `Linked to ${plannerFile.name}. Ctrl+S in the planner updates it.`;
+  } else {
+    plannerFileStatusEl.textContent = "No planner file yet. Press Ctrl+S in the planner (or the button below) and choose where to keep it, for example your Documents folder.";
+  }
+  document.getElementById("planner-file-save").classList.toggle("hidden", !fileApiOk);
+  document.getElementById("planner-file-open").classList.toggle("hidden", !fileApiOk);
+}
+
+document.getElementById("planner-file-save").addEventListener("click", async () => {
+  plannerFile.declined = false;
+  const r = await backupToFile();
+  if (r.status === "error") alert("Couldn't write the planner file.");
+});
+document.getElementById("planner-file-open").addEventListener("click", restoreFromPickedFile);
+document.getElementById("planner-file-download").addEventListener("click", downloadBackup);
+document.getElementById("planner-file-restore").addEventListener("click", () => restoreInputEl.click());
+restoreInputEl.addEventListener("change", async () => {
+  const file = restoreInputEl.files && restoreInputEl.files[0];
+  restoreInputEl.value = "";
+  if (!file) return;
+  try {
+    restoreFromText(await file.text());
+  } catch (e) {
+    alert(e && e.message ? e.message : "That file couldn't be opened.");
+  }
+});
+
+// Shown when a visit starts with nothing saved: either a first visit, or a browser that cleared its data.
+function showRestoreBanner() {
+  const bar = document.createElement("div");
+  bar.className = "restore-banner";
+  bar.setAttribute("role", "status");
+  const text = document.createElement("span");
+  text.textContent = "Welcome! If you saved your planner before and it isn't showing, bring it back from your planner file.";
+  const actions = document.createElement("span");
+  actions.className = "restore-banner-actions";
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "btn btn-primary btn-small";
+  open.textContent = fileApiOk ? "Open my planner file…" : "Restore from a file…";
+  open.addEventListener("click", () => (fileApiOk ? restoreFromPickedFile() : restoreInputEl.click()));
+  const later = document.createElement("button");
+  later.type = "button";
+  later.className = "btn btn-secondary btn-small";
+  later.textContent = "Not now";
+  later.addEventListener("click", () => bar.remove());
+  actions.append(open, later);
+  bar.append(text, actions);
+  document.body.appendChild(bar);
 }
 
 /* =====================================================================
@@ -1802,6 +2007,11 @@ migrateTagsV4();
 importSlideMeals();
 importSlideMealsV2();
 
+// A visit with no saved visit and no chosen week means nothing was kept: new here, or the browser cleared its data.
+const cameBackToSavedData = loadJSON(STORAGE_KEYS.visited, false) || !!state.currentWeekKey;
+saveJSON(STORAGE_KEYS.visited, true);
+if (!cameBackToSavedData) showRestoreBanner();
+
 if (!storageWorks()) {
   saveStatus.ok = false;
   const warn = document.createElement("div");
@@ -1814,7 +2024,7 @@ if (!storageWorks()) {
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-18a") {
+if (PlannerEngine.BUILD !== "2026-10-18b") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";

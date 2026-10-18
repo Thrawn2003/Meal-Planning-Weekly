@@ -1229,3 +1229,32 @@ body.plan-fit .cell-reason { flex: none; font-size: 0.68rem; line-height: 1.2; w
 .pdf-preview-sheet { background: #fff; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45); overflow: hidden; }
 .pdf-preview-sheet .print-sheet { background: #fff; }
 .pdf-card > div:last-child { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+/* ===================== Planner file panel and welcome-back banner ===================== */
+.planner-file { margin-top: 1.5rem; }
+.planner-file h2 { margin-top: 0; color: var(--brown-dark); }
+.planner-file-status { font-weight: 700; color: var(--green-dark); }
+.planner-file-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.restore-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 950;
+  width: min(760px, 94vw);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  background: var(--beige);
+  border: 1px solid var(--brown);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(58, 46, 34, 0.3);
+  color: var(--brown-dark);
+  font-weight: 700;
+}
+.restore-banner-actions { display: flex; gap: 0.5rem; }
+

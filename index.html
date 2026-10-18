@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=2026-10-18a">
+<link rel="stylesheet" href="css/styles.css?v=2026-10-18b">
 </head>
 <body>
 
@@ -189,6 +189,19 @@
       <p class="hint">Every week you save (Ctrl+S) or print shows up here. View it, print it or save it as a PDF again, or reopen it in the planner to keep editing.</p>
     </div>
     <div id="pdf-history-list" class="pdf-history-list"></div>
+
+    <div class="card planner-file" id="planner-file-panel">
+      <h2>💾 Your planner file</h2>
+      <p class="hint">Your weeks and meals are kept inside this browser. Some browsers clear that when they close, so a planner file keeps a copy on your computer. Ctrl+S in the planner updates it, and you can bring everything back from it here.</p>
+      <p id="planner-file-status" class="planner-file-status"></p>
+      <div class="planner-file-actions">
+        <button type="button" id="planner-file-save" class="btn btn-primary btn-small">Save to planner file now</button>
+        <button type="button" id="planner-file-open" class="btn btn-secondary btn-small">Open my planner file…</button>
+        <button type="button" id="planner-file-download" class="btn btn-secondary btn-small">Download a backup</button>
+        <button type="button" id="planner-file-restore" class="btn btn-secondary btn-small">Restore from a backup…</button>
+      </div>
+      <input type="file" id="restore-input" accept=".json,application/json" class="hidden">
+    </div>
   </section>
 
   <div id="pdf-preview" class="pdf-preview hidden" role="dialog" aria-modal="true" aria-label="Saved week preview">
@@ -205,11 +218,12 @@
 
 </main>
 
-<script src="js/tag-tools.js?v=2026-10-18a"></script>
-<script src="js/dish-knowledge.js?v=2026-10-18a"></script>
-<script src="js/slide-meals.js?v=2026-10-18a"></script>
-<script src="js/meal-search.js?v=2026-10-18a"></script>
-<script src="js/planner-engine.js?v=2026-10-18a"></script>
-<script src="js/app.js?v=2026-10-18a"></script>
+<script src="js/tag-tools.js?v=2026-10-18b"></script>
+<script src="js/dish-knowledge.js?v=2026-10-18b"></script>
+<script src="js/backup.js?v=2026-10-18b"></script>
+<script src="js/slide-meals.js?v=2026-10-18b"></script>
+<script src="js/meal-search.js?v=2026-10-18b"></script>
+<script src="js/planner-engine.js?v=2026-10-18b"></script>
+<script src="js/app.js?v=2026-10-18b"></script>
 </body>
 </html>
