@@ -880,6 +880,96 @@ table.week-table tbody tr:nth-child(even) td {
   color: var(--green-dark);
 }
 
+/* ===================== The printable week sheet (printing and the on-screen preview) ===================== */
+.print-sheet {
+  display: flex;
+  flex-direction: column;
+  width: 10.2in;
+  height: 7.65in;
+  overflow: hidden;
+  break-inside: avoid;
+  font-family: "Nunito", "Segoe UI", Arial, sans-serif;
+  color: #2a1f14;
+}
+
+.print-sheet h1 {
+  flex: none;
+  margin: 0 0 0.12in;
+  text-align: center;
+  font-family: "Quicksand", "Segoe UI", Arial, sans-serif;
+  font-size: 27pt;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  color: #2f4a2f;
+}
+
+.print-table {
+  flex: 1;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 3px solid #3f5a3f;
+}
+
+.print-table th, .print-table td {
+  border: 1.5px solid #6b4a34;
+  padding: 0.07in 0.06in;
+}
+
+.print-table thead th {
+  background: #3f5a3f;
+  color: #fff;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.08in 0.04in;
+}
+.print-table thead th.corner { width: 1.25in; font-size: 14pt; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.print-table thead th.special { background: #a8641c; }
+.pd-name { display: block; font-size: 12.5pt; font-weight: 800; letter-spacing: 0; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
+.pd-date { display: block; font-size: 10.5pt; font-weight: 600; opacity: 0.95; }
+.pd-tag {
+  display: block;
+  margin: 0.03in auto 0;
+  padding: 1px 6px;
+  max-width: 100%;
+  background: #f6d27a;
+  color: #4a3000;
+  border-radius: 10px;
+  font-size: 9.5pt;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.print-table tbody th {
+  background: #8a6642;
+  color: #fff;
+  text-align: left;
+  vertical-align: middle;
+  padding-left: 0.12in;
+  font-size: 14pt;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.print-table td {
+  background: #fffdf8;
+  text-align: center;
+  vertical-align: middle;
+}
+.print-table tbody tr:nth-child(even) td { background: #f3ead2; }
+.print-table td span {
+  display: block;
+  font-size: 14.5pt;
+  font-weight: 800;
+  line-height: 1.18;
+  color: #2a1f14;
+  overflow-wrap: anywhere;
+}
+.print-table td.special { background: #f8e0a6; }
+.print-table tbody tr:nth-child(even) td.special { background: #f2d58f; }
+
 /* ===================== Print styles (US Letter, landscape, fills the page) ===================== */
 .print-only { display: none; }
 
@@ -898,7 +988,7 @@ table.week-table tbody tr:nth-child(even) td {
 
   .navbar, .calendar-toolbar, .cal-selection-status, #calendar-picker, .week-header, .filters-panel,
   .table-scroll, .autopop-status, #week-table-wrap, #view-add-meal, #view-pdfs, .meal-picker-panel,
-  .update-warning { display: none !important; }
+  .update-warning, .pdf-preview { display: none !important; }
 
   main#app { margin: 0 !important; padding: 0 !important; max-width: none !important; overflow: visible !important; background: #fff; }
   #view-plan { display: block !important; }
@@ -909,95 +999,6 @@ table.week-table tbody tr:nth-child(even) td {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-
-  .print-sheet {
-    display: flex;
-    flex-direction: column;
-    width: 10.2in;
-    height: 7.65in;
-    overflow: hidden;
-    break-inside: avoid;
-    font-family: "Nunito", "Segoe UI", Arial, sans-serif;
-    color: #2a1f14;
-  }
-
-  .print-sheet h1 {
-    flex: none;
-    margin: 0 0 0.12in;
-    text-align: center;
-    font-family: "Quicksand", "Segoe UI", Arial, sans-serif;
-    font-size: 27pt;
-    font-weight: 800;
-    letter-spacing: 0.01em;
-    line-height: 1.1;
-    color: #2f4a2f;
-  }
-
-  .print-table {
-    flex: 1;
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-    border: 3px solid #3f5a3f;
-  }
-
-  .print-table th, .print-table td {
-    border: 1.5px solid #6b4a34;
-    padding: 0.07in 0.06in;
-  }
-
-  .print-table thead th {
-    background: #3f5a3f;
-    color: #fff;
-    text-align: center;
-    vertical-align: middle;
-    padding: 0.08in 0.04in;
-  }
-  .print-table thead th.corner { width: 1.25in; font-size: 14pt; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
-  .print-table thead th.special { background: #a8641c; }
-  .pd-name { display: block; font-size: 12.5pt; font-weight: 800; letter-spacing: 0; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
-  .pd-date { display: block; font-size: 10.5pt; font-weight: 600; opacity: 0.95; }
-  .pd-tag {
-    display: block;
-    margin: 0.03in auto 0;
-    padding: 1px 6px;
-    max-width: 100%;
-    background: #f6d27a;
-    color: #4a3000;
-    border-radius: 10px;
-    font-size: 9.5pt;
-    font-weight: 800;
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-  }
-
-  .print-table tbody th {
-    background: #8a6642;
-    color: #fff;
-    text-align: left;
-    vertical-align: middle;
-    padding-left: 0.12in;
-    font-size: 14pt;
-    font-weight: 800;
-    line-height: 1.15;
-  }
-
-  .print-table td {
-    background: #fffdf8;
-    text-align: center;
-    vertical-align: middle;
-  }
-  .print-table tbody tr:nth-child(even) td { background: #f3ead2; }
-  .print-table td span {
-    display: block;
-    font-size: 14.5pt;
-    font-weight: 800;
-    line-height: 1.18;
-    color: #2a1f14;
-    overflow-wrap: anywhere;
-  }
-  .print-table td.special { background: #f8e0a6; }
-  .print-table tbody tr:nth-child(even) td.special { background: #f2d58f; }
 }
 
 .routine-toggle {
@@ -1194,3 +1195,37 @@ body.plan-fit .cell-reason { flex: none; font-size: 0.68rem; line-height: 1.2; w
   body.plan-fit table.week-table { height: auto; min-width: 900px; }
   body.plan-fit .cell-editor textarea { min-height: 3.4rem; }
 }
+
+/* ===================== Save indicator and saved-week preview ===================== */
+.save-indicator {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--green-dark);
+  white-space: nowrap;
+}
+.save-indicator-bad { color: var(--danger-dark); background: #f8d7cf; border-radius: 999px; padding: 0.15rem 0.7rem; }
+
+.pdf-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  background: rgba(40, 30, 20, 0.72);
+}
+.pdf-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--beige-light);
+  border-bottom: 1px solid var(--beige-dark);
+  color: var(--brown-dark);
+}
+.pdf-preview-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.pdf-preview-stage { flex: 1; min-height: 0; overflow: auto; padding: 16px; display: flex; justify-content: center; align-items: flex-start; }
+.pdf-preview-sheet { background: #fff; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45); overflow: hidden; }
+.pdf-preview-sheet .print-sheet { background: #fff; }
+.pdf-card > div:last-child { display: flex; flex-wrap: wrap; gap: 0.4rem; }

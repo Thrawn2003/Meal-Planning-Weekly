@@ -165,11 +165,46 @@ function loadJSON(key, fallback) {
   }
 }
 
+// Whether the last write to this browser's storage worked, and when. Shown next to the week title.
+const saveStatus = { ok: true, at: null };
+
 function saveJSON(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    saveStatus.ok = true;
+    saveStatus.at = new Date();
   } catch (e) {
     console.warn("Failed to save", key, e);
+    saveStatus.ok = false;
+  }
+  updateSaveIndicator();
+  return saveStatus.ok;
+}
+
+function updateSaveIndicator() {
+  const el = document.getElementById("save-indicator");
+  if (!el) return;
+  el.classList.toggle("save-indicator-bad", !saveStatus.ok);
+  if (!saveStatus.ok) {
+    el.textContent = "⚠ This browser is not letting the site save";
+    el.title = "Your changes will be lost when you close this tab. Open the site in a normal (not private) window and allow site data.";
+  } else if (saveStatus.at) {
+    el.textContent = "✓ Saved " + saveStatus.at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    el.title = "Everything you type is saved in this browser as you go. Press Ctrl+S to also add the week to All PDFs and your meal library.";
+  } else {
+    el.textContent = "";
+  }
+}
+
+// True when this browser lets the site keep data between visits (private windows and blocked site data do not).
+function storageWorks() {
+  try {
+    const k = "mpw_storage_test";
+    localStorage.setItem(k, "1");
+    localStorage.removeItem(k);
+    return true;
+  } catch (e) {
+    return false;
   }
 }
 
@@ -704,6 +739,7 @@ function renderWeekTable() {
   renderFilters();
 
   weekTitleEl.textContent = plan.title;
+  updateSaveIndicator();
 
   const dates = weekDates(plan);
 
@@ -898,8 +934,19 @@ function markMealUsed(meal, weekStartISO) {
 
 /* ---------------------- Save to library (Ctrl+S) ---------------------- */
 
-// Puts every meal typed into this week into the meal library, and links the boxes to them.
-function saveWeekToLibrary() {
+// Adds a week to the list on the All PDFs tab (or refreshes its saved time) without printing anything.
+function recordSavedWeek(plan) {
+  const record = { weekKey: plan.weekStart, title: plan.title, savedAt: new Date().toISOString() };
+  const existingIdx = state.pdfHistory.findIndex((h) => h.weekKey === plan.weekStart);
+  if (existingIdx >= 0) state.pdfHistory[existingIdx] = record;
+  else state.pdfHistory.push(record);
+  state.pdfHistory.sort((a, b) => a.weekKey.localeCompare(b.weekKey));
+  persistPdfHistory();
+}
+
+// Ctrl+S: keeps this week (it is also saved as you type), lists it on All PDFs so it can be viewed or printed
+// later, and puts every meal typed into it into the meal library, linking the boxes to those meals.
+function saveWeek() {
   const plan = currentPlan();
   if (!plan) return;
   const out = MealSearch.collectNewMeals(plan, state.meals, SLOTS, {
@@ -908,16 +955,22 @@ function saveWeekToLibrary() {
   });
   persistMeals();
   persistPlans();
+  persistCurrentWeekKey();
+  recordSavedWeek(plan);
 
   const lines = [];
+  if (saveStatus.ok) {
+    lines.push({ text: `💾 Saved ${plan.title}.` });
+    lines.push({ text: "It will be here when you come back to Meal Planning, and you can view or print it any time under All PDFs.", small: true });
+  } else {
+    lines.push({ text: "⚠ This browser would not save. Open the site in a normal (not private) window, or allow site data, so your week is kept." });
+  }
   if (out.created.length) {
     const names = out.created.map((m) => m.name);
     lines.push({
-      text: `💾 Saved ${names.length} new meal${names.length === 1 ? "" : "s"} to your library: ${names.slice(0, 6).join(", ")}${names.length > 6 ? ` and ${names.length - 6} more` : ""}.`,
+      text: `Added ${names.length} new meal${names.length === 1 ? "" : "s"} to your meal library: ${names.slice(0, 6).join(", ")}${names.length > 6 ? ` and ${names.length - 6} more` : ""}. Each is ticked for the row you typed it in.`,
+      small: true,
     });
-    lines.push({ text: "Each one is ticked for the row you typed it in. Tags can be checked later on Add New Meal.", small: true });
-  } else {
-    lines.push({ text: "💾 Everything in this week is already in your meal library. Nothing new to save." });
   }
   const moved = out.widened.filter((m) => !out.created.includes(m));
   if (moved.length) {
@@ -927,7 +980,7 @@ function saveWeekToLibrary() {
   renderWeekTable();
 }
 
-document.getElementById("save-library-btn").addEventListener("click", saveWeekToLibrary);
+document.getElementById("save-week-btn").addEventListener("click", saveWeek);
 
 document.addEventListener("keydown", (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== "s") return;
@@ -935,7 +988,7 @@ document.addEventListener("keydown", (e) => {
   if (!planning) return;
   e.preventDefault(); // not the browser's "save page" dialog
   closeMealPicker();
-  saveWeekToLibrary();
+  saveWeek();
 });
 
 document.getElementById("clear-week-btn").addEventListener("click", () => {
@@ -1177,17 +1230,7 @@ function escapeHTML(str) {
 
 function saveAndPrintPlan(plan) {
   printAreaEl.innerHTML = buildPrintTable(plan);
-
-  const existingIdx = state.pdfHistory.findIndex((h) => h.weekKey === plan.weekStart);
-  const record = { weekKey: plan.weekStart, title: plan.title, savedAt: new Date().toISOString() };
-  if (existingIdx >= 0) {
-    state.pdfHistory[existingIdx] = record;
-  } else {
-    state.pdfHistory.push(record);
-  }
-  state.pdfHistory.sort((a, b) => a.weekKey.localeCompare(b.weekKey));
-  persistPdfHistory();
-
+  recordSavedWeek(plan);
   window.print();
 }
 
@@ -1203,11 +1246,74 @@ document.getElementById("save-pdf-btn").addEventListener("click", () => {
 
 const pdfHistoryListEl = document.getElementById("pdf-history-list");
 
+const pdfPreviewEl = document.getElementById("pdf-preview");
+const pdfPreviewStageEl = document.getElementById("pdf-preview-stage");
+const pdfPreviewSheetEl = document.getElementById("pdf-preview-sheet");
+let pdfPreviewWeekKey = null;
+
+// Shows a saved week exactly as it prints, scaled to fit the window.
+function openPdfPreview(weekKey) {
+  const plan = state.plans[weekKey];
+  if (!plan) {
+    alert("That week's data no longer exists.");
+    return;
+  }
+  pdfPreviewWeekKey = weekKey;
+  document.getElementById("pdf-preview-title").textContent = plan.title;
+  pdfPreviewSheetEl.innerHTML = buildPrintTable(plan);
+  pdfPreviewEl.classList.remove("hidden");
+  fitPdfPreview();
+}
+
+function fitPdfPreview() {
+  if (pdfPreviewEl.classList.contains("hidden")) return;
+  const sheet = pdfPreviewSheetEl.querySelector(".print-sheet");
+  if (!sheet) return;
+  const w = sheet.offsetWidth;
+  const h = sheet.offsetHeight;
+  const scale = Math.min(1, (pdfPreviewStageEl.clientWidth - 32) / w, (pdfPreviewStageEl.clientHeight - 32) / h);
+  pdfPreviewSheetEl.style.width = `${w * scale}px`;
+  pdfPreviewSheetEl.style.height = `${h * scale}px`;
+  sheet.style.transformOrigin = "top left";
+  sheet.style.transform = `scale(${scale})`;
+}
+
+function closePdfPreview() {
+  pdfPreviewEl.classList.add("hidden");
+  pdfPreviewSheetEl.innerHTML = "";
+  pdfPreviewWeekKey = null;
+}
+
+function openWeekInPlanner(weekKey) {
+  if (!state.plans[weekKey]) {
+    alert("That week's data no longer exists.");
+    return;
+  }
+  closePdfPreview();
+  state.currentWeekKey = weekKey;
+  persistCurrentWeekKey();
+  showView("plan");
+}
+
+document.getElementById("pdf-preview-close").addEventListener("click", closePdfPreview);
+document.getElementById("pdf-preview-open").addEventListener("click", () => pdfPreviewWeekKey && openWeekInPlanner(pdfPreviewWeekKey));
+document.getElementById("pdf-preview-print").addEventListener("click", () => {
+  const plan = state.plans[pdfPreviewWeekKey];
+  if (plan) saveAndPrintPlan(plan);
+});
+pdfPreviewEl.addEventListener("click", (e) => {
+  if (e.target === pdfPreviewEl) closePdfPreview();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !pdfPreviewEl.classList.contains("hidden")) closePdfPreview();
+});
+window.addEventListener("resize", fitPdfPreview);
+
 function renderPdfHistoryView() {
   pdfHistoryListEl.innerHTML = "";
 
   if (state.pdfHistory.length === 0) {
-    pdfHistoryListEl.innerHTML = `<div class="empty-state">📭 Nothing here yet! From the Meal Planning tab, fill in a week and click "Save &amp; Print PDF" to see it show up here.</div>`;
+    pdfHistoryListEl.innerHTML = `<div class="empty-state">📭 Nothing here yet! On the Meal Planning tab, fill in a week and press Ctrl+S (or click "Save &amp; Print PDF") and it shows up here.</div>`;
     return;
   }
 
@@ -1217,15 +1323,21 @@ function renderPdfHistoryView() {
 
     const info = document.createElement("div");
     info.className = "pdf-card-info";
-    info.innerHTML = `<strong>${escapeHTML(record.title)}</strong><br><span class="saved-at">Saved ${new Date(record.savedAt).toLocaleString()}</span>`;
+    const plan = state.plans[record.weekKey];
+    const filled = plan ? Object.values(plan.cells || {}).filter((c) => c && String(c.text || "").trim()).length : 0;
+    info.innerHTML = `<strong>${escapeHTML(record.title)}</strong><br><span class="saved-at">Saved ${new Date(record.savedAt).toLocaleString()} · ${filled} meal${filled === 1 ? "" : "s"} planned</span>`;
 
     const actions = document.createElement("div");
 
     const viewBtn = document.createElement("button");
     viewBtn.className = "btn btn-primary btn-small";
-    viewBtn.textContent = "View / Print";
-    viewBtn.addEventListener("click", () => {
-      const plan = state.plans[record.weekKey];
+    viewBtn.textContent = "👁 View";
+    viewBtn.addEventListener("click", () => openPdfPreview(record.weekKey));
+
+    const printBtn = document.createElement("button");
+    printBtn.className = "btn btn-secondary btn-small";
+    printBtn.textContent = "🖨️ Print / Save as PDF";
+    printBtn.addEventListener("click", () => {
       if (!plan) {
         alert("That week's data no longer exists.");
         return;
@@ -1236,15 +1348,7 @@ function renderPdfHistoryView() {
     const openBtn = document.createElement("button");
     openBtn.className = "btn btn-secondary btn-small";
     openBtn.textContent = "Open in Planner";
-    openBtn.addEventListener("click", () => {
-      if (!state.plans[record.weekKey]) {
-        alert("That week's data no longer exists.");
-        return;
-      }
-      state.currentWeekKey = record.weekKey;
-      persistCurrentWeekKey();
-      showView("plan");
-    });
+    openBtn.addEventListener("click", () => openWeekInPlanner(record.weekKey));
 
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "btn btn-danger btn-small";
@@ -1257,6 +1361,7 @@ function renderPdfHistoryView() {
     });
 
     actions.appendChild(viewBtn);
+    actions.appendChild(printBtn);
     actions.appendChild(openBtn);
     actions.appendChild(deleteBtn);
 
@@ -1696,10 +1801,20 @@ migrateTagsV3(tagsBeforeMigrations);
 migrateTagsV4();
 importSlideMeals();
 importSlideMealsV2();
+
+if (!storageWorks()) {
+  saveStatus.ok = false;
+  const warn = document.createElement("div");
+  warn.setAttribute("role", "alert");
+  warn.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;padding:10px 16px;background:#f8d7cf;color:#6e2a1b;text-align:center;font-weight:700";
+  warn.textContent = "This browser is not letting the site save anything, so what you plan will be gone when you close this tab. Open the site in a normal (not private) window and allow site data.";
+  document.body.appendChild(warn);
+}
+
 showView("plan");
 
 // If the browser kept an older copy of the planner, say so instead of quietly planning badly.
-if (PlannerEngine.BUILD !== "2026-10-12a") {
+if (PlannerEngine.BUILD !== "2026-10-18a") {
   const warn = document.createElement("div");
   warn.setAttribute("role", "alert");
   warn.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 16px;background:#fff3cd;color:#5a3e1b;text-align:center;font-weight:700";
