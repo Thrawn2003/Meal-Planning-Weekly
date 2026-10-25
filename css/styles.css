@@ -881,6 +881,7 @@ table.week-table tbody tr:nth-child(even) td {
 }
 
 /* ===================== The printable week sheet (printing and the on-screen preview) ===================== */
+/* Light on ink on purpose: a white page, color in the text and thin rules instead of filled blocks. */
 .print-sheet {
   display: flex;
   flex-direction: column;
@@ -888,20 +889,23 @@ table.week-table tbody tr:nth-child(even) td {
   height: 7.65in;
   overflow: hidden;
   break-inside: avoid;
+  background: #fff;
   font-family: "Nunito", "Segoe UI", Arial, sans-serif;
-  color: #2a1f14;
+  color: #1f1812;
 }
 
 .print-sheet h1 {
   flex: none;
-  margin: 0 0 0.12in;
+  margin: 0 0 0.14in;
+  padding-bottom: 0.07in;
   text-align: center;
   font-family: "Quicksand", "Segoe UI", Arial, sans-serif;
-  font-size: 27pt;
+  font-size: 25pt;
   font-weight: 800;
   letter-spacing: 0.01em;
   line-height: 1.1;
   color: #2f4a2f;
+  border-bottom: 2px solid #6b8e4e;
 }
 
 .print-table {
@@ -909,66 +913,72 @@ table.week-table tbody tr:nth-child(even) td {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  border: 3px solid #3f5a3f;
+  border: 1.5px solid #3f5a3f;
 }
 
 .print-table th, .print-table td {
-  border: 1.5px solid #6b4a34;
+  border: 0.75px solid #b3a68c;
   padding: 0.07in 0.06in;
 }
 
 .print-table thead th {
-  background: #3f5a3f;
-  color: #fff;
+  background: none;
+  color: #2f4a2f;
   text-align: center;
   vertical-align: middle;
   padding: 0.08in 0.04in;
+  border-bottom: 2px solid #3f5a3f;
 }
-.print-table thead th.corner { width: 1.25in; font-size: 14pt; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
-.print-table thead th.special { background: #a8641c; }
+.print-table thead th.corner { width: 1.25in; font-size: 13pt; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #6b4a34; }
+.print-table thead th.special { color: #8a4f0f; }
 .pd-name { display: block; font-size: 12.5pt; font-weight: 800; letter-spacing: 0; text-transform: uppercase; line-height: 1.15; white-space: nowrap; }
-.pd-date { display: block; font-size: 10.5pt; font-weight: 600; opacity: 0.95; }
+.pd-date { display: block; font-size: 10.5pt; font-weight: 600; color: #5d5446; }
 .pd-tag {
   display: block;
   margin: 0.03in auto 0;
-  padding: 1px 6px;
+  padding: 0 6px;
   max-width: 100%;
-  background: #f6d27a;
-  color: #4a3000;
+  background: none;
+  color: #8a4f0f;
+  border: 1.25px solid #a8641c;
   border-radius: 10px;
   font-size: 9.5pt;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
 .print-table tbody th {
-  background: #8a6642;
-  color: #fff;
+  background: none;
+  color: #6b4a34;
   text-align: left;
   vertical-align: middle;
-  padding-left: 0.12in;
+  padding-left: 0.1in;
   font-size: 14pt;
   font-weight: 800;
   line-height: 1.15;
+  border-right: 2px solid #8a6642;
 }
 
 .print-table td {
-  background: #fffdf8;
+  background: none;
   text-align: center;
   vertical-align: middle;
 }
-.print-table tbody tr:nth-child(even) td { background: #f3ead2; }
 .print-table td span {
   display: block;
-  font-size: 14.5pt;
-  font-weight: 800;
+  font-size: 14pt;
+  font-weight: 700;
   line-height: 1.18;
-  color: #2a1f14;
+  color: #1f1812;
   overflow-wrap: anywhere;
 }
-.print-table td.special { background: #f8e0a6; }
-.print-table tbody tr:nth-child(even) td.special { background: #f2d58f; }
+/* a special day: a very pale tint down its column (it is fine if a printer leaves it out; the tag remains) */
+.print-table td.special {
+  background: #fcf4de;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
 
 /* ===================== Print styles (US Letter, landscape, fills the page) ===================== */
 .print-only { display: none; }
@@ -995,7 +1005,12 @@ table.week-table tbody tr:nth-child(even) td {
 
   .print-only { display: block !important; }
 
-  * {
+  /* colored text and lines always print; filled backgrounds only where asked for above */
+  .print-sheet * {
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+  }
+  .print-sheet td.special {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

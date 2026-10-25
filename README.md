@@ -102,7 +102,7 @@ The four dated weeks of the slideshow (Sept 7 through Oct 3) are also saved as y
 - **Ctrl+S (or the Save button) saves the week.** Everything you type is already kept in this browser as you go; Ctrl+S also lists the week on the **All PDFs** tab (so you can view or print it any time), puts the meals you typed into your meal library (ticked for the row you typed them in, with the obvious tags and a place in the tag review), and tells you plainly that it saved. A "Saved" time sits next to the week title, and a warning appears if your browser is blocking saving (private windows do). A box listing several meals ("Kebab / Samosa") saves each one. Nothing is removed or retagged.
 - **All PDFs.** Every saved or printed week is listed. **View** shows it exactly as it prints, **Print / Save as PDF** opens the print dialog, and **Open in Planner** brings it back to edit.
 - **Special days.** Click "Mark special" under any day to give it a tag you type (a birthday, a trip). The day is shaded in a different color and the tag shows on the printed sheet.
-- **The PDF fills US Letter, landscape,** with large bold text, a color-coded header and rows, and special days highlighted.
+- **The PDF fills US Letter, landscape and is easy on ink.** It is a white page with large, bold, dark text; color comes from the title, day names, row labels and thin rules rather than filled blocks, so it prints with a small fraction of the ink of a filled-in table. Special days get an outlined tag and a very pale tint (which simply drops out if your printer's "background graphics" setting is off).
 
 ## Your planner file (if your browser forgets)
 
